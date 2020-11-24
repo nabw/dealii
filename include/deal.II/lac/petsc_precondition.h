@@ -954,6 +954,71 @@ namespace PETScWrappers
      */
     AdditionalData additional_data;
   };
+
+  /**
+   * A class that implements the interface to use the BDDC preconditioner from
+   * PETSc.
+   *
+   * @ingroup PETScWrappers
+   * @author Nicolas Barnafi, 2020
+   */
+  class PreconditionBDDC : public PreconditionerBase {
+  public:
+    /**
+     * Standardized data struct to pipe additional flags to the
+     * preconditioner.
+     */
+    struct AdditionalData {
+      /**
+       * Constructor. Note that BoomerAMG offers a lot more options to set
+       * than what is exposed here.
+       */
+      AdditionalData(const bool use_edges = false, const bool use_faces = false,
+                     const bool output_details = false);
+    };
+  
+    /**
+     * Empty Constructor. You need to call initialize() before using this
+     * object.
+     */
+    PreconditionBDDC() = default;
+  
+    /**
+     * Constructor. Take the matrix which is used to form the preconditioner,
+     * and additional flags if there are any.
+     */
+    PreconditionBDDC(const MatrixBase &matrix,
+                     const AdditionalData &additional_data = AdditionalData());
+  
+    /**
+     * Same as above but without setting a matrix to form the preconditioner.
+     * Intended to be used with SLEPc objects.
+     */
+    PreconditionBDDC(const MPI_Comm communicator,
+                     const AdditionalData &additional_data = AdditionalData());
+  
+    /**
+     * Initialize the preconditioner object and calculate all data that is
+     * necessary for applying it in a solver. This function is automatically
+     * called when calling the constructor with the same arguments and is only
+     * used if you create the preconditioner without arguments.
+     */
+    void initialize(const MatrixBase &matrix,
+                    const AdditionalData &additional_data = AdditionalData());
+  
+  protected:
+    /**
+     * Store a copy of the flags for this particular preconditioner.
+     */
+    AdditionalData additional_data;
+  
+    /**
+     * Initialize the preconditioner object without knowing a particular
+     * matrix. This function sets up appropriate parameters to the underlying
+     * PETSc object after it has been created.
+     */
+    void initialize();
+  };
 } // namespace PETScWrappers
 
 

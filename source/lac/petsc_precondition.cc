@@ -746,6 +746,76 @@ namespace PETScWrappers
     AssertThrow(ierr == 0, ExcPETScError(ierr));
   }
 
+  /* ----------------- PreconditionBDDC -------------------- */
+
+  PreconditionBDDC::AdditionalData::AdditionalData(const bool use_edges,
+                                                   const bool use_faces,
+                                                   const bool output_details) {}
+
+  PreconditionBDDC::PreconditionBDDC(const MPI_Comm comm,
+                                     const AdditionalData &additional_data_) {
+    additional_data = additional_data_;
+
+    PetscErrorCode ierr = PCCreate(comm, &pc);
+    AssertThrow(ierr == 0, ExcPETScError(ierr));
+
+    initialize();
+  }
+
+  PreconditionBDDC::PreconditionBDDC(const MatrixBase &matrix,
+                                     const AdditionalData &additional_data) {
+    initialize(matrix, additional_data);
+  }
+
+  void PreconditionBDDC::initialize() {
+    PetscErrorCode ierr = PCSetType(pc, const_cast<char *>(PCBDDC));
+    AssertThrow(ierr == 0, ExcPETScError(ierr));
+
+    // TODO: Add BDDC options, in particular the additional primal nodes
+    // set_option_value(
+    //     "-pc_hypre_boomeramg_agg_nl",
+    //     std::to_string(additional_data.aggressive_coarsening_num_levels));
+
+    // std::stringstream ssStream;
+    // ssStream << additional_data.max_row_sum;
+    // set_option_value("-pc_hypre_boomeramg_max_row_sum", ssStream.str());
+
+    // ssStream.str(""); // empty the stringstream
+    // ssStream << additional_data.strong_threshold;
+    // set_option_value("-pc_hypre_boomeramg_strong_threshold", ssStream.str());
+
+    // if (additional_data.symmetric_operator) {
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_up",
+    //                    "symmetric-SOR/Jacobi");
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_down",
+    //                    "symmetric-SOR/Jacobi");
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_coarse",
+    //                    "Gaussian-elimination");
+    // } else {
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_up", "SOR/Jacobi");
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_down", "SOR/Jacobi");
+    //   set_option_value("-pc_hypre_boomeramg_relax_type_coarse",
+    //                    "Gaussian-elimination");
+    // }
+
+    ierr = PCSetFromOptions(pc);
+    AssertThrow(ierr == 0, ExcPETScError(ierr));
+  }
+
+  void PreconditionBDDC::initialize(const MatrixBase &matrix_,
+                                    const AdditionalData &additional_data_) {
+    clear();
+
+    matrix = static_cast<Mat>(matrix_);
+    additional_data = additional_data_;
+
+    create_pc();
+    initialize();
+
+    PetscErrorCode ierr = PCSetUp(pc);
+    AssertThrow(ierr == 0, ExcPETScError(ierr));
+  }
+
 } // namespace PETScWrappers
 
 DEAL_II_NAMESPACE_CLOSE

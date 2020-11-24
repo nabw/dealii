@@ -166,6 +166,22 @@ namespace PETScWrappers
              const BlockDynamicSparsityPattern &bdsp,
              const MPI_Comm &                   com);
 
+       /**
+       * Efficiently reinit the block matrix for a parallel computation using the MATIS format. Only
+       * the BlockSparsityPattern of the Simple type can efficiently store
+       * large sparsity patterns in parallel, so this is the only supported
+       * argument. The IndexSets describe the locally owned range of DoFs for
+       * each block. Note that the IndexSets needs to be ascending and 1:1.
+       * For a symmetric structure hand in the same vector for the first two
+       * arguments.
+       */
+      void
+      reinit_IS(const std::vector<IndexSet> &      rows_local,
+                const std::vector<IndexSet> &      rows_active,
+                const std::vector<IndexSet> &      cols_local,
+                const std::vector<IndexSet> &      cols_active,
+                const BlockDynamicSparsityPattern &bdsp,
+                const MPI_Comm &                   com);
 
 
       /**

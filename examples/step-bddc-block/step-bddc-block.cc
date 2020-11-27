@@ -437,7 +437,12 @@ namespace Step55
       active_partitioning[0] = locally_active_dofs.get_view(0, n_u);
       active_partitioning[1] = locally_active_dofs.get_view(n_u, n_u + n_p);
 
-      system_matrix.reinit_IS(owned_partitioning, active_partitioning, owned_partitioning, active_partitioning, dsp, mpi_communicator);
+      system_matrix.reinit_IS(owned_partitioning,
+                              active_partitioning,
+                              owned_partitioning,
+                              active_partitioning,
+                              dsp,
+                              mpi_communicator);
     }
 
     // The preconditioner matrix has a different coupling (we only fill in
@@ -469,7 +474,7 @@ namespace Step55
       //                              dsp,
       //                              mpi_communicator);
 
-            // Added for BDDC, first compute locally active dofs.
+      // Added for BDDC, first compute locally active dofs.
       IndexSet locally_active_dofs;
       DoFTools::extract_locally_active_dofs(dof_handler, locally_active_dofs);
 
@@ -626,18 +631,21 @@ namespace Step55
 
     // The InverseMatrix is used to solve for the mass matrix:
     // using mp_inverse_t = LinearSolvers::InverseMatrix<LA::MPI::SparseMatrix,
-                                                      // LA::MPI::PreconditionAMG>;
-    using mp_inverse_t = LinearSolvers::InverseMatrix<LA::MPI::SparseMatrix,
-                                                      dealii::PETScWrappers::PreconditionBDDC>;
+    // LA::MPI::PreconditionAMG>;
+    using mp_inverse_t =
+      LinearSolvers::InverseMatrix<LA::MPI::SparseMatrix,
+                                   dealii::PETScWrappers::PreconditionBDDC>;
     const mp_inverse_t mp_inverse(preconditioner_matrix.block(1, 1), prec_S);
 
     // This constructs the block preconditioner based on the preconditioners
     // for the individual blocks defined above.
-    // const LinearSolvers::BlockDiagonalPreconditioner<LA::MPI::PreconditionAMG,
-                                                     // mp_inverse_t>
-      // preconditioner(prec_A, mp_inverse);
-    const LinearSolvers::BlockDiagonalPreconditioner<dealii::PETScWrappers::PreconditionBDDC,
-                                                     mp_inverse_t>
+    // const
+    // LinearSolvers::BlockDiagonalPreconditioner<LA::MPI::PreconditionAMG,
+    // mp_inverse_t>
+    // preconditioner(prec_A, mp_inverse);
+    const LinearSolvers::BlockDiagonalPreconditioner<
+      dealii::PETScWrappers::PreconditionBDDC,
+      mp_inverse_t>
       preconditioner(prec_A, mp_inverse);
 
     // With that, we can finally set up the linear solver and solve the system:

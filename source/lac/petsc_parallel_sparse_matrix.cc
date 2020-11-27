@@ -256,7 +256,11 @@ namespace PETScWrappers
       const PetscErrorCode ierr = destroy_matrix(matrix);
       AssertThrow(ierr == 0, ExcPETScError(ierr));
 
-      do_reinit_IS(local_rows, local_active_rows, local_columns, local_active_columns, sparsity_pattern);
+      do_reinit_IS(local_rows,
+                   local_active_rows,
+                   local_columns,
+                   local_active_columns,
+                   sparsity_pattern);
     }
 
     void
@@ -510,11 +514,11 @@ namespace PETScWrappers
     // BDDC
     template <typename SparsityPatternType>
     void
-    SparseMatrix::do_reinit_IS(const IndexSet &        local_rows,
-                            const IndexSet &           local_active_rows,
-                            const IndexSet &           local_columns,
-                            const IndexSet &           local_active_columns,
-                            const SparsityPatternType &sparsity_pattern)
+    SparseMatrix::do_reinit_IS(const IndexSet &           local_rows,
+                               const IndexSet &           local_active_rows,
+                               const IndexSet &           local_columns,
+                               const IndexSet &           local_active_columns,
+                               const SparsityPatternType &sparsity_pattern)
     {
       Assert(sparsity_pattern.n_rows() == local_rows.size(),
              ExcMessage(
@@ -554,48 +558,48 @@ namespace PETScWrappers
 #  endif
 
       // create the local to global mappings as arrays.
-      IndexSet::size_type n_l2g_row = local_active_rows.n_elements(); 
-      IndexSet::size_type n_l2g_col = local_active_columns.n_elements(); 
-      int idx_glob_row[n_l2g_row];
-      int idx_glob_col[n_l2g_col];
-      unsigned int k = 0;
-      for (k = 0; k < n_l2g_row; ++k) 
+      IndexSet::size_type n_l2g_row = local_active_rows.n_elements();
+      IndexSet::size_type n_l2g_col = local_active_columns.n_elements();
+      int                 idx_glob_row[n_l2g_row];
+      int                 idx_glob_col[n_l2g_col];
+      unsigned int        k = 0;
+      for (k = 0; k < n_l2g_row; ++k)
         {
           idx_glob_row[k] = local_active_rows.nth_index_in_set(k);
         }
-      for (k = 0; k < n_l2g_col; ++k) 
+      for (k = 0; k < n_l2g_col; ++k)
         {
           idx_glob_col[k] = local_active_columns.nth_index_in_set(k);
         }
-    
+
 
       IS is_glob_row, is_glob_col;
       // Create row index set
       ISLocalToGlobalMapping l2gmap_row;
-      ISCreateGeneral(communicator, n_l2g_row, idx_glob_row, PETSC_COPY_VALUES,
-                          &is_glob_row);
+      ISCreateGeneral(
+        communicator, n_l2g_row, idx_glob_row, PETSC_COPY_VALUES, &is_glob_row);
       ISLocalToGlobalMappingCreateIS(is_glob_row, &l2gmap_row);
       ISDestroy(&is_glob_row);
       ISLocalToGlobalMappingViewFromOptions(l2gmap_row, NULL, "-view_map");
 
       // Create column index set
       ISLocalToGlobalMapping l2gmap_col;
-      ISCreateGeneral(communicator, n_l2g_col, idx_glob_col, PETSC_COPY_VALUES,
-                          &is_glob_col);
+      ISCreateGeneral(
+        communicator, n_l2g_col, idx_glob_col, PETSC_COPY_VALUES, &is_glob_col);
       ISLocalToGlobalMappingCreateIS(is_glob_col, &l2gmap_col);
       ISDestroy(&is_glob_col);
       ISLocalToGlobalMappingViewFromOptions(l2gmap_col, NULL, "-view_map");
 
       // create the matrix with the IS constructor.
-      PetscErrorCode ierr = MatCreateIS(communicator,  
-                                       1,
-                                       local_rows.n_elements(),
-                                       local_columns.n_elements(),
-                                       sparsity_pattern.n_rows(),
-                                       sparsity_pattern.n_cols(),
-                                       l2gmap_row,
-                                       l2gmap_col,
-                                       &matrix);
+      PetscErrorCode ierr = MatCreateIS(communicator,
+                                        1,
+                                        local_rows.n_elements(),
+                                        local_columns.n_elements(),
+                                        sparsity_pattern.n_rows(),
+                                        sparsity_pattern.n_cols(),
+                                        l2gmap_row,
+                                        l2gmap_col,
+                                        &matrix);
       AssertThrow(ierr == 0, ExcPETScError(ierr));
 
       // next preset the exact given matrix
@@ -615,29 +619,33 @@ namespace PETScWrappers
       // In the MATIS case, we use the local matrix instead
       Mat local_matrix;
       MatISGetLocalMat(matrix, &local_matrix);
-      MatSetType(local_matrix, MATSEQAIJ); // SEQ as it is local! TODO: Allow for OpenMP parallelization in local node.
+      MatSetType(local_matrix,
+                 MATSEQAIJ); // SEQ as it is local! TODO: Allow for OpenMP
+                             // parallelization in local node.
       if (local_rows.n_elements() > 0)
         {
           // MatSEQAIJSetPreallocationCSR
           // can be used to allocate the sparsity
           // pattern of a matrix. Local matrices start from 0 (MATIS).
           const PetscInt local_row_start = 0;
-          const PetscInt local_row_end = local_active_rows.n_elements();
+          const PetscInt local_row_end   = local_active_rows.n_elements();
 
           // first set up the column number
           // array for the rows to be stored
           // on the local processor.
-          std::vector<PetscInt>
-            rowstart_in_window(local_row_end - local_row_start + 1, 0),
+          std::vector<PetscInt> rowstart_in_window(local_row_end -
+                                                     local_row_start + 1,
+                                                   0),
             colnums_in_window;
           unsigned int global_row_index = 0;
           {
-            unsigned int n_cols = 0;
+            unsigned int n_cols           = 0;
             unsigned int global_row_index = 0;
             for (PetscInt i = local_row_start; i < local_row_end; ++i)
               {
                 global_row_index = local_active_rows.nth_index_in_set(i);
-                const PetscInt row_length = sparsity_pattern.row_length(global_row_index);
+                const PetscInt row_length =
+                  sparsity_pattern.row_length(global_row_index);
                 rowstart_in_window[i + 1 - local_row_start] =
                   rowstart_in_window[i - local_row_start] + row_length;
                 n_cols += row_length;
@@ -647,21 +655,22 @@ namespace PETScWrappers
 
 
           // now copy over the information
-          // from the sparsity pattern. For this we first invert the column index set.
-          std::map<unsigned int, unsigned int>  loc_act_cols_inv;
-          for(unsigned int i=0; i < local_active_columns.n_elements(); ++i)
+          // from the sparsity pattern. For this we first invert the column
+          // index set.
+          std::map<unsigned int, unsigned int> loc_act_cols_inv;
+          for (unsigned int i = 0; i < local_active_columns.n_elements(); ++i)
             {
               loc_act_cols_inv[local_active_columns.nth_index_in_set(i)] = i;
             }
-          
-          { 
-            PetscInt *ptr = colnums_in_window.data();
+
+          {
+            PetscInt *   ptr          = colnums_in_window.data();
             unsigned int column_local = 0;
             for (PetscInt i = local_row_start; i < local_row_end; ++i)
               {
                 global_row_index = local_active_rows.nth_index_in_set(i);
                 for (typename SparsityPatternType::iterator p =
-                     sparsity_pattern.begin(global_row_index);
+                       sparsity_pattern.begin(global_row_index);
                      p != sparsity_pattern.end(global_row_index);
                      ++p, ++ptr)
                   *ptr = loc_act_cols_inv[p->column()];
@@ -680,7 +689,7 @@ namespace PETScWrappers
       else
         {
           PetscInt i = 0;
-          ierr       = MatSeqAIJSetPreallocationCSR(local_matrix, &i, &i, nullptr);
+          ierr = MatSeqAIJSetPreallocationCSR(local_matrix, &i, &i, nullptr);
           AssertThrow(ierr == 0, ExcPETScError(ierr));
         }
       compress(dealii::VectorOperation::insert);
@@ -986,16 +995,16 @@ namespace PETScWrappers
 
     template void
     SparseMatrix::do_reinit_IS(const IndexSet &,
-                            const IndexSet &,
-                            const IndexSet &,
-                            const IndexSet &,
-                            const SparsityPattern &);
+                               const IndexSet &,
+                               const IndexSet &,
+                               const IndexSet &,
+                               const SparsityPattern &);
     template void
     SparseMatrix::do_reinit_IS(const IndexSet &,
-                            const IndexSet &,
-                            const IndexSet &,
-                            const IndexSet &,
-                            const DynamicSparsityPattern &);
+                               const IndexSet &,
+                               const IndexSet &,
+                               const IndexSet &,
+                               const DynamicSparsityPattern &);
   } // namespace MPI
 } // namespace PETScWrappers
 

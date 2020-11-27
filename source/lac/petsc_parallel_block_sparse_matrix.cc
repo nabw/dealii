@@ -111,10 +111,14 @@ namespace PETScWrappers
                                  const BlockDynamicSparsityPattern &bdsp,
                                  const MPI_Comm &                   com)
     {
-      Assert(rows.size() == bdsp.n_block_rows(), ExcMessage("invalid size of rows vector"));
-      Assert(rows_active.size() == bdsp.n_block_rows(), ExcMessage("invalid size of active rows vector"));
-      Assert(cols.size() == bdsp.n_block_cols(), ExcMessage("invalid size of columns vector"));
-      Assert(cols_active.size() == bdsp.n_block_cols(), ExcMessage("invalid size active columns vector"));
+      Assert(rows.size() == bdsp.n_block_rows(),
+             ExcMessage("invalid size of rows vector"));
+      Assert(rows_active.size() == bdsp.n_block_rows(),
+             ExcMessage("invalid size of active rows vector"));
+      Assert(cols.size() == bdsp.n_block_cols(),
+             ExcMessage("invalid size of columns vector"));
+      Assert(cols_active.size() == bdsp.n_block_cols(),
+             ExcMessage("invalid size active columns vector"));
 
 
       clear();
@@ -139,7 +143,12 @@ namespace PETScWrappers
                    ExcMessage("invalid size"));
 
             BlockType *p = new BlockType();
-            p->reinit_IS(rows[r], rows_active[r], cols[c], cols_active[c], bdsp.block(r, c), com);
+            p->reinit_IS(rows[r],
+                         rows_active[r],
+                         cols[c],
+                         cols_active[c],
+                         bdsp.block(r, c),
+                         com);
             this->sub_objects[r][c] = p;
           }
 

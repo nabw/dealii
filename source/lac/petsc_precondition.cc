@@ -750,10 +750,12 @@ namespace PETScWrappers
 
   PreconditionBDDC::AdditionalData::AdditionalData(const bool use_edges,
                                                    const bool use_faces,
-                                                   const bool output_details) {}
+                                                   const bool output_details)
+  {}
 
-  PreconditionBDDC::PreconditionBDDC(const MPI_Comm comm,
-                                     const AdditionalData &additional_data_) {
+  PreconditionBDDC::PreconditionBDDC(const MPI_Comm        comm,
+                                     const AdditionalData &additional_data_)
+  {
     additional_data = additional_data_;
 
     PetscErrorCode ierr = PCCreate(comm, &pc);
@@ -762,12 +764,15 @@ namespace PETScWrappers
     initialize();
   }
 
-  PreconditionBDDC::PreconditionBDDC(const MatrixBase &matrix,
-                                     const AdditionalData &additional_data) {
+  PreconditionBDDC::PreconditionBDDC(const MatrixBase &    matrix,
+                                     const AdditionalData &additional_data)
+  {
     initialize(matrix, additional_data);
   }
 
-  void PreconditionBDDC::initialize() {
+  void
+  PreconditionBDDC::initialize()
+  {
     PetscErrorCode ierr = PCSetType(pc, const_cast<char *>(PCBDDC));
     AssertThrow(ierr == 0, ExcPETScError(ierr));
 
@@ -802,11 +807,13 @@ namespace PETScWrappers
     AssertThrow(ierr == 0, ExcPETScError(ierr));
   }
 
-  void PreconditionBDDC::initialize(const MatrixBase &matrix_,
-                                    const AdditionalData &additional_data_) {
+  void
+  PreconditionBDDC::initialize(const MatrixBase &    matrix_,
+                               const AdditionalData &additional_data_)
+  {
     clear();
 
-    matrix = static_cast<Mat>(matrix_);
+    matrix          = static_cast<Mat>(matrix_);
     additional_data = additional_data_;
 
     create_pc();

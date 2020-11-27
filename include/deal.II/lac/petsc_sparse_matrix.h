@@ -609,8 +609,8 @@ namespace PETScWrappers
        * give the rows and columns for the calling processor. Note that only
        * ascending, 1:1 IndexSets are supported. The additional call to the
        * local to global mappings is required to create the matrix of type
-       * IS (see DoFTools::extract_locally_active_dofs). 
-       * This is required by the BDDC preconditioner. 
+       * IS (see DoFTools::extract_locally_active_dofs).
+       * This is required by the BDDC preconditioner.
        */
       template <typename SparsityPatternType>
       void

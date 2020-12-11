@@ -47,6 +47,7 @@ namespace LA
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
+#include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/vector.h>
 
@@ -73,7 +74,7 @@ namespace LA
 #include <fstream>
 #include <iostream>
 
-namespace Step40
+namespace BDDC
 {
   using namespace dealii;
 
@@ -360,7 +361,7 @@ namespace Step40
 
     // std::cout << "NORMS TEST " << mat_norm2 << ", " << mat_norm << std::endl;
 
-  } // namespace Step40
+  } // namespace BDDC
 
   template <int dim>
   void LaplaceProblem<dim>::solve()
@@ -492,7 +493,7 @@ namespace Step40
 
     pcout << std::endl;
   }
-} // namespace Step40
+} // namespace BDDC
 
 // @sect4{main()}
 
@@ -523,7 +524,7 @@ int main(int argc, char *argv[])
   try
     {
       using namespace dealii;
-      using namespace Step40;
+      using namespace BDDC;
 
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
 

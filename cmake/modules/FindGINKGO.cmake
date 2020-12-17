@@ -72,7 +72,7 @@ DEAL_II_FIND_LIBRARY(GINKGO_DPCPP_LIBRARY
   PATH_SUFFIXES
     lib${LIB_SUFFIX} lib64 lib
     # This is a hint, isn't it?
-    build/${CMAKE_CXX_PLATFORM_ID}-${CMAKE_SYSTEM_PROCESSOR}/libginkgo_hip
+    build/${CMAKE_CXX_PLATFORM_ID}-${CMAKE_SYSTEM_PROCESSOR}/libginkgo_dpcpp
   )
 
 DEAL_II_FIND_PATH(GINKGO_INCLUDE_DIR ginkgo/ginkgo.hpp

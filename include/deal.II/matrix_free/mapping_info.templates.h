@@ -30,6 +30,7 @@
 
 #include <deal.II/matrix_free/evaluation_template_factory.h>
 #include <deal.II/matrix_free/mapping_info.h>
+#include <deal.II/matrix_free/util.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -71,7 +72,7 @@ namespace internal
       for (unsigned int i = 0; i < n_q_points; ++i)
         quadrature_weights[i] = quadrature.weight(i);
 
-      // note: quadrature_1 and tensor_quadrature_weights are not set up
+      // note: quadrature_1d and tensor_quadrature_weights are not set up
 
       // TODO: set up face_orientations
       (void)update_flags_inner_faces;
@@ -404,15 +405,25 @@ namespace internal
               if (flag == false)
                 {
 #ifdef DEAL_II_WITH_SIMPLEX_SUPPORT
-                  continue; // TODO: face data is not set up
+                  try
+                    {
+                      const auto quad_face =
+                        get_face_quadrature(quad[my_q][hpq]);
+                      face_data[my_q].descriptor[hpq].initialize(
+                        quad_face, update_default);
+                    }
+                  catch (...)
+                    {
+                      // TODO: nothing to do for now for wedges and pyramids.
+                    }
 #else
                   Assert(false, ExcNotImplemented());
 #endif
                 }
-
-              face_data[my_q].descriptor[hpq].initialize(
-                quad[my_q][hpq].get_tensor_basis()[0],
-                update_flags_boundary_faces);
+              else
+                face_data[my_q].descriptor[hpq].initialize(
+                  quad[my_q][hpq].get_tensor_basis()[0],
+                  update_flags_boundary_faces);
             }
 
           face_data_by_cells[my_q].descriptor.resize(n_hp_quads);
@@ -428,14 +439,24 @@ namespace internal
               if (flag == false)
                 {
 #ifdef DEAL_II_WITH_SIMPLEX_SUPPORT
-                  continue; // TODO: face data is not set up
+                  try
+                    {
+                      const auto quad_face =
+                        get_face_quadrature(quad[my_q][hpq]);
+                      face_data_by_cells[my_q].descriptor[hpq].initialize(
+                        quad_face, update_default);
+                    }
+                  catch (...)
+                    {
+                      // TODO: nothing to do for now for wedges and pyramids.
+                    }
 #else
                   Assert(false, ExcNotImplemented());
 #endif
                 }
-
-              face_data_by_cells[my_q].descriptor[hpq].initialize(
-                quad[my_q][hpq].get_tensor_basis()[0], update_default);
+              else
+                face_data_by_cells[my_q].descriptor[hpq].initialize(
+                  quad[my_q][hpq].get_tensor_basis()[0], update_default);
             }
         }
 
@@ -450,7 +471,8 @@ namespace internal
           // Could call these functions in parallel, but not useful because
           // the work inside is nicely split up already
           initialize_cells(tria, cells, active_fe_index, *mapping);
-          initialize_faces(tria, cells, face_info.faces, *mapping);
+          initialize_faces(
+            tria, cells, face_info.faces, active_fe_index, *mapping);
           initialize_faces_by_cells(tria, cells, *mapping);
         }
     }
@@ -487,7 +509,8 @@ namespace internal
           // Could call these functions in parallel, but not useful because
           // the work inside is nicely split up already
           initialize_cells(tria, cells, active_fe_index, *mapping);
-          initialize_faces(tria, cells, face_info.faces, *mapping);
+          initialize_faces(
+            tria, cells, face_info.faces, active_fe_index, *mapping);
           initialize_faces_by_cells(tria, cells, *mapping);
         }
     }
@@ -889,14 +912,13 @@ namespace internal
         std::vector<std::vector<std::shared_ptr<dealii::FEValues<dim>>>>
           fe_values(mapping_info.cell_data.size());
 
-        const unsigned int n_active_fe_indices =
+        const unsigned int max_active_fe_index =
           active_fe_index.size() > 0 ?
-            (*std::max_element(active_fe_index.begin(), active_fe_index.end()) +
-             1) :
-            1;
+            *std::max_element(active_fe_index.begin(), active_fe_index.end()) :
+            0;
 
         for (unsigned int i = 0; i < fe_values.size(); ++i)
-          fe_values[i].resize(n_active_fe_indices);
+          fe_values[i].resize(max_active_fe_index + 1);
         const UpdateFlags update_flags = mapping_info.update_flags_cells;
         const UpdateFlags update_flags_feval =
           (update_flags & update_jacobians ? update_jacobians :
@@ -1725,10 +1747,24 @@ namespace internal
       // indices of the Jacobian appropriately.
       template <int dim>
       unsigned int
-      reorder_face_derivative_indices(const unsigned int face_no,
-                                      const unsigned int index)
+      reorder_face_derivative_indices(
+        const unsigned int        face_no,
+        const unsigned int        index,
+        const ReferenceCell::Type reference_cell_type =
+          ReferenceCell::Type::Invalid)
       {
         Assert(index < dim, ExcInternalError());
+
+        if ((reference_cell_type == ReferenceCell::Type::Invalid ||
+             reference_cell_type == ReferenceCell::get_hypercube(dim)) == false)
+          {
+#ifdef DEAL_II_WITH_SIMPLEX_SUPPORT
+            return index;
+#else
+            Assert(false, ExcNotImplemented());
+#endif
+          }
+
         if (dim == 3)
           {
             unsigned int table[3][3] = {{1, 2, 0}, {2, 0, 1}, {0, 1, 2}};
@@ -1759,6 +1795,7 @@ namespace internal
         const std::vector<std::pair<unsigned int, unsigned int>> &cells,
         const std::vector<FaceToCellTopology<VectorizedArrayType::size()>>
           &                                            faces,
+        const std::vector<unsigned int> &              active_fe_index,
         const dealii::hp::MappingCollection<dim> &     mapping_in,
         MappingInfo<dim, Number, VectorizedArrayType> &mapping_info,
         std::pair<
@@ -1766,24 +1803,25 @@ namespace internal
             MappingInfoStorage<dim - 1, dim, Number, VectorizedArrayType>>,
           CompressedFaceData<dim, Number, VectorizedArrayType>> &data)
       {
-        AssertDimension(mapping_in.size(), 1);
-        const auto &mapping = mapping_in[0];
-
         FE_Nothing<dim> dummy_fe;
+
+        const unsigned int max_active_fe_index =
+          active_fe_index.size() > 0 ?
+            *std::max_element(active_fe_index.begin(), active_fe_index.end()) :
+            0;
 
         std::vector<std::vector<std::shared_ptr<FEFaceValues<dim>>>>
           fe_face_values_container(mapping_info.face_data.size());
         for (unsigned int my_q = 0; my_q < mapping_info.face_data.size();
              ++my_q)
-          fe_face_values_container[my_q].resize(
-            mapping_info.face_data[my_q].descriptor.size());
+          fe_face_values_container[my_q].resize(max_active_fe_index + 1);
 
         std::vector<std::vector<std::shared_ptr<FEFaceValues<dim>>>>
           fe_boundary_face_values_container(mapping_info.face_data.size());
         for (unsigned int my_q = 0; my_q < mapping_info.face_data.size();
              ++my_q)
-          fe_boundary_face_values_container[my_q].resize(
-            mapping_info.face_data[my_q].descriptor.size());
+          fe_boundary_face_values_container[my_q].resize(max_active_fe_index +
+                                                         1);
 
         std::vector<std::vector<std::shared_ptr<FESubfaceValues<dim>>>>
           fe_subface_values_container(mapping_info.face_data.size());
@@ -1801,25 +1839,47 @@ namespace internal
           for (unsigned int my_q = 0; my_q < mapping_info.face_data.size();
                ++my_q)
             {
+#ifndef DEAL_II_WITH_SIMPLEX_SUPPORT
               // currently only non-hp case...
-              Assert(mapping_info.face_data[my_q].descriptor.size() == 1,
-                     ExcNotImplemented());
+              AssertDimension(mapping_in.size(), 1);
+              AssertDimension(mapping_info.face_data[my_q].descriptor.size(),
+                              1);
+#endif
+
+              // We assume that we have the faces sorted by the active fe
+              // indices so that the active fe index of the interior side of the
+              // face batch is the same as the fe index of the interior side of
+              // its first entry.
+              const unsigned int fe_index =
+                active_fe_index.size() > 0 ?
+                  active_fe_index[faces[face].cells_interior[0] /
+                                  VectorizedArrayType::size()] :
+                  0;
+              const unsigned int hp_quad_index =
+                mapping_info.cell_data[my_q].descriptor.size() == 1 ? 0 :
+                                                                      fe_index;
+              const unsigned int hp_mapping_index =
+                mapping_in.size() == 1 ? 0 : fe_index;
+
+              const auto &               mapping = mapping_in[hp_mapping_index];
               const Quadrature<dim - 1> &quadrature =
-                mapping_info.face_data[my_q].descriptor[0].quadrature;
+                mapping_info.face_data[my_q]
+                  .descriptor[hp_quad_index]
+                  .quadrature;
 
               const bool is_boundary_face =
                 faces[face].cells_exterior[0] == numbers::invalid_unsigned_int;
 
               if (is_boundary_face &&
-                  fe_boundary_face_values_container[my_q][0] == nullptr)
-                fe_boundary_face_values_container[my_q][0] =
+                  fe_boundary_face_values_container[my_q][fe_index] == nullptr)
+                fe_boundary_face_values_container[my_q][fe_index] =
                   std::make_shared<FEFaceValues<dim>>(
                     mapping,
                     dummy_fe,
                     quadrature,
                     mapping_info.update_flags_boundary_faces);
-              else if (fe_face_values_container[my_q][0] == nullptr)
-                fe_face_values_container[my_q][0] =
+              else if (fe_face_values_container[my_q][fe_index] == nullptr)
+                fe_face_values_container[my_q][fe_index] =
                   std::make_shared<FEFaceValues<dim>>(
                     mapping,
                     dummy_fe,
@@ -1827,8 +1887,9 @@ namespace internal
                     mapping_info.update_flags_inner_faces);
 
               FEFaceValues<dim> &fe_face_values =
-                is_boundary_face ? *fe_boundary_face_values_container[my_q][0] :
-                                   *fe_face_values_container[my_q][0];
+                is_boundary_face ?
+                  *fe_boundary_face_values_container[my_q][fe_index] :
+                  *fe_face_values_container[my_q][fe_index];
               const unsigned int n_q_points =
                 fe_face_values.n_quadrature_points;
               face_data.resize(n_q_points);
@@ -1890,7 +1951,9 @@ namespace internal
                                   JxW_is_similar = false;
                                 const unsigned int ee =
                                   reorder_face_derivative_indices<dim>(
-                                    faces[face].interior_face_no, e);
+                                    faces[face].interior_face_no,
+                                    e,
+                                    cell_it->reference_cell_type());
                                 face_data.general_jac[q][d][e][v] =
                                   inv_jac[d][ee];
                               }
@@ -1962,9 +2025,44 @@ namespace internal
                       if (faces[face].subface_index >=
                           GeometryInfo<dim>::max_children_per_cell)
                         {
-                          fe_face_values.reinit(cell_it,
-                                                faces[face].exterior_face_no);
-                          actual_fe_face_values = &fe_face_values;
+                          // We assume that we have the faces sorted by the
+                          // active fe indices so that the active fe index of
+                          // the exterior side of the face batch is the same as
+                          // the fe index of the exterior side of its first
+                          // entry.
+                          const unsigned int fe_index =
+                            active_fe_index.size() > 0 ?
+                              active_fe_index[faces[face].cells_exterior[0] /
+                                              VectorizedArrayType::size()] :
+                              0;
+                          const unsigned int hp_quad_index =
+                            mapping_info.cell_data[my_q].descriptor.size() ==
+                                1 ?
+                              0 :
+                              fe_index;
+                          const unsigned int hp_mapping_index =
+                            mapping_in.size() == 1 ? 0 : fe_index;
+
+                          const auto &mapping = mapping_in[hp_mapping_index];
+                          const Quadrature<dim - 1> &quadrature =
+                            mapping_info.face_data[my_q]
+                              .descriptor[hp_quad_index]
+                              .quadrature;
+
+                          if (fe_face_values_container[my_q][fe_index] ==
+                              nullptr)
+                            fe_face_values_container[my_q][fe_index] =
+                              std::make_shared<FEFaceValues<dim>>(
+                                mapping,
+                                dummy_fe,
+                                quadrature,
+                                mapping_info.update_flags_boundary_faces);
+
+                          fe_face_values_container[my_q][fe_index]->reinit(
+                            cell_it, faces[face].exterior_face_no);
+
+                          actual_fe_face_values =
+                            fe_face_values_container[my_q][fe_index].get();
                         }
                       else
                         {
@@ -2001,7 +2099,9 @@ namespace internal
                                   JxW_is_similar = false;
                                 const unsigned int ee =
                                   reorder_face_derivative_indices<dim>(
-                                    faces[face].exterior_face_no, e);
+                                    faces[face].exterior_face_no,
+                                    e,
+                                    cell_it->reference_cell_type());
                                 face_data.general_jac[n_q_points + q][d][e][v] =
                                   inv_jac[d][ee];
                               }
@@ -2406,6 +2506,7 @@ namespace internal
       const dealii::Triangulation<dim> &                                  tria,
       const std::vector<std::pair<unsigned int, unsigned int>> &          cells,
       const std::vector<FaceToCellTopology<VectorizedArrayType::size()>> &faces,
+      const std::vector<unsigned int> &         active_fe_index,
       const dealii::hp::MappingCollection<dim> &mapping)
     {
       face_type.resize(faces.size(), general);
@@ -2449,6 +2550,7 @@ namespace internal
               tria,
               cells,
               faces,
+              active_fe_index,
               mapping,
               *this,
               data_faces_local.back());

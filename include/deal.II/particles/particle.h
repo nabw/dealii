@@ -190,8 +190,8 @@ namespace Particles
      * contains serialized data of the same length and type that is allocated
      * by @p property_pool.
      */
-    Particle(const void *&       begin_data,
-             PropertyPool *const property_pool = nullptr);
+    Particle(const void *&                      begin_data,
+             PropertyPool<dim, spacedim> *const property_pool = nullptr);
 
     /**
      * Move constructor for Particle, creates a particle from an existing
@@ -360,7 +360,7 @@ namespace Particles
      * allocated in the new property pool.
      */
     void
-    set_property_pool(PropertyPool &property_pool);
+    set_property_pool(PropertyPool<dim, spacedim> &property_pool);
 
     /**
      * Return whether this particle has a valid property pool and a valid
@@ -429,7 +429,10 @@ namespace Particles
 
     /**
      * Read the data of this object from a stream for the purpose of
-     * serialization.
+     * serialization. Note that in order to store the properties
+     * correctly, the property pool of this particle has to
+     * be known at the time of reading, i.e. set_property_pool()
+     * has to have been called, before this function is called.
      */
     template <class Archive>
     void
@@ -475,12 +478,12 @@ namespace Particles
      * A pointer to the property pool. Necessary to translate from the
      * handle to the actual memory locations.
      */
-    PropertyPool *property_pool;
+    PropertyPool<dim, spacedim> *property_pool;
 
     /**
      * A handle to all particle properties
      */
-    PropertyPool::Handle properties;
+    typename PropertyPool<dim, spacedim>::Handle property_pool_handle;
   };
 
   /* ---------------------- inline and template functions ------------------ */
@@ -496,8 +499,18 @@ namespace Particles
 
     if (n_properties > 0)
       {
-        properties = new double[n_properties];
-        ar &boost::serialization::make_array(properties, n_properties);
+        ArrayView<double> properties(get_properties());
+        Assert(
+          properties.size() == n_properties,
+          ExcMessage(
+            "This particle was serialized with " +
+            std::to_string(n_properties) +
+            " properties, but the new property handler provides space for " +
+            std::to_string(properties.size()) +
+            " properties. Deserializing a particle only works for matching property sizes."));
+
+        ar &boost::serialization::make_array(get_properties().data(),
+                                             n_properties);
       }
   }
 
@@ -510,13 +523,14 @@ namespace Particles
   {
     unsigned int n_properties = 0;
     if ((property_pool != nullptr) &&
-        (properties != PropertyPool::invalid_handle))
+        (property_pool_handle != PropertyPool<dim, spacedim>::invalid_handle))
       n_properties = get_properties().size();
 
     ar &location &reference_location &id &n_properties;
 
     if (n_properties > 0)
-      ar &boost::serialization::make_array(properties, n_properties);
+      ar &boost::serialization::make_array(get_properties().data(),
+                                           n_properties);
   }
 
 
@@ -577,19 +591,22 @@ namespace Particles
 
   template <int dim, int spacedim>
   inline void
-  Particle<dim, spacedim>::set_property_pool(PropertyPool &new_property_pool)
+  Particle<dim, spacedim>::set_property_pool(
+    PropertyPool<dim, spacedim> &new_property_pool)
   {
     // First, we do want to save any properties that may
     // have previously been set, and copy them over to the memory allocated
     // on the new pool
-    PropertyPool::Handle new_handle = PropertyPool::invalid_handle;
-    if (property_pool != nullptr && properties != PropertyPool::invalid_handle)
+    typename PropertyPool<dim, spacedim>::Handle new_handle =
+      PropertyPool<dim, spacedim>::invalid_handle;
+    if (property_pool != nullptr &&
+        property_pool_handle != PropertyPool<dim, spacedim>::invalid_handle)
       {
-        new_handle = new_property_pool.allocate_properties_array();
+        new_handle = new_property_pool.register_particle();
 
         ArrayView<double> old_properties = this->get_properties();
         ArrayView<double> new_properties =
-          property_pool->get_properties(new_handle);
+          new_property_pool.get_properties(new_handle);
         std::copy(old_properties.cbegin(),
                   old_properties.cend(),
                   new_properties.begin());
@@ -597,14 +614,15 @@ namespace Particles
 
     // If the particle currently has a reference to properties, then
     // release those.
-    if (property_pool != nullptr && properties != PropertyPool::invalid_handle)
-      property_pool->deallocate_properties_array(properties);
+    if (property_pool != nullptr &&
+        property_pool_handle != PropertyPool<dim, spacedim>::invalid_handle)
+      property_pool->deregister_particle(property_pool_handle);
 
 
     // Then set the pointer to the property pool we want to use. Also set the
     // handle to any properties, if we have copied any above.
-    property_pool = &new_property_pool;
-    properties    = new_handle;
+    property_pool        = &new_property_pool;
+    property_pool_handle = new_handle;
   }
 
 
@@ -615,7 +633,7 @@ namespace Particles
   {
     Assert(has_properties(), ExcInternalError());
 
-    return property_pool->get_properties(properties);
+    return property_pool->get_properties(property_pool_handle);
   }
 
 
@@ -625,7 +643,8 @@ namespace Particles
   Particle<dim, spacedim>::has_properties() const
   {
     return (property_pool != nullptr) &&
-           (properties != PropertyPool::invalid_handle);
+           (property_pool_handle !=
+            PropertyPool<dim, spacedim>::invalid_handle);
   }
 
 } // namespace Particles

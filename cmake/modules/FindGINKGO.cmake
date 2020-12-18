@@ -56,6 +56,22 @@ DEAL_II_FIND_LIBRARY(GINKGO_CUDA_LIBRARY
     # This is a hint, isn't it?
     build/${CMAKE_CXX_PLATFORM_ID}-${CMAKE_SYSTEM_PROCESSOR}/libginkgo_cuda
   )
+DEAL_II_FIND_LIBRARY(GINKGO_HIP_LIBRARY
+  NAMES ginkgo_hip
+  HINTS ${GINKGO_DIR}
+  PATH_SUFFIXES
+    lib${LIB_SUFFIX} lib64 lib
+    # This is a hint, isn't it?
+    build/${CMAKE_CXX_PLATFORM_ID}-${CMAKE_SYSTEM_PROCESSOR}/libginkgo_hip
+  )
+DEAL_II_FIND_LIBRARY(GINKGO_DPCPP_LIBRARY
+  NAMES ginkgo_dpcpp
+  HINTS ${GINKGO_DIR}
+  PATH_SUFFIXES
+    lib${LIB_SUFFIX} lib64 lib
+    # This is a hint, isn't it?
+    build/${CMAKE_CXX_PLATFORM_ID}-${CMAKE_SYSTEM_PROCESSOR}/libginkgo_dpcpp
+  )
 
 DEAL_II_FIND_LIBRARY(GINKGO_HIP_LIBRARY
   NAMES ginkgo_hip

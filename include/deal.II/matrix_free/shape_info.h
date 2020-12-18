@@ -132,8 +132,7 @@ namespace internal
 
       /**
        * Stores the shape values of the 1D finite element evaluated on all 1D
-       * quadrature points in vectorized format, i.e., as an array of
-       * VectorizedArray<dim>::size equal elements. The length of
+       * quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
        */
@@ -141,8 +140,7 @@ namespace internal
 
       /**
        * Stores the shape gradients of the 1D finite element evaluated on all
-       * 1D quadrature points in vectorized format, i.e., as an array of
-       * VectorizedArray<dim>::size equal elements. The length of
+       * 1D quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
        */
@@ -150,8 +148,7 @@ namespace internal
 
       /**
        * Stores the shape Hessians of the 1D finite element evaluated on all
-       * 1D quadrature points in vectorized format, i.e., as an array of
-       * VectorizedArray<dim>::size equal elements. The length of
+       * 1D quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
        */
@@ -285,6 +282,20 @@ namespace internal
        * end points of the unit cell.
        */
       bool nodal_at_cell_boundaries;
+
+      /**
+       * Stores the shape values of the finite element evaluated on all
+       * quadrature points for all faces and orientations (no tensor-product
+       * structure exploited).
+       */
+      Table<3, Number> shape_values_face;
+
+      /**
+       * Stores the shape gradients of the finite element evaluated on all
+       * quadrature points for all faces, orientations, and directions
+       * (no tensor-product structure  exploited).
+       */
+      Table<4, Number> shape_gradients_face;
     };
 
 

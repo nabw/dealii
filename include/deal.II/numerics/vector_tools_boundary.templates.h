@@ -417,8 +417,7 @@ namespace VectorTools
     const ComponentMask &                      component_mask)
   {
     std::map<types::boundary_id, const Function<spacedim, number> *>
-      function_map;
-    function_map[boundary_component] = &boundary_function;
+      function_map = {{boundary_component, &boundary_function}};
     interpolate_boundary_values(
       mapping, dof, function_map, boundary_values, component_mask);
   }
@@ -436,6 +435,24 @@ namespace VectorTools
   {
     internal::do_interpolate_boundary_values(
       mapping, dof, function_map, boundary_values, component_mask_);
+  }
+
+
+
+  template <int dim, int spacedim, typename number>
+  void
+  interpolate_boundary_values(
+    const hp::MappingCollection<dim, spacedim> &mapping,
+    const DoFHandler<dim, spacedim> &           dof,
+    const types::boundary_id                    boundary_component,
+    const Function<spacedim, number> &          boundary_function,
+    std::map<types::global_dof_index, number> & boundary_values,
+    const ComponentMask &                       component_mask)
+  {
+    std::map<types::boundary_id, const Function<spacedim, number> *>
+      function_map = {{boundary_component, &boundary_function}};
+    interpolate_boundary_values(
+      mapping, dof, function_map, boundary_values, component_mask);
   }
 
 
@@ -495,16 +512,14 @@ namespace VectorTools
     std::map<types::global_dof_index, number> boundary_values;
     interpolate_boundary_values(
       mapping, dof, function_map, boundary_values, component_mask_);
-    typename std::map<types::global_dof_index, number>::const_iterator
-      boundary_value = boundary_values.begin();
-    for (; boundary_value != boundary_values.end(); ++boundary_value)
+    for (const auto &boundary_value : boundary_values)
       {
-        if (constraints.can_store_line(boundary_value->first) &&
-            !constraints.is_constrained(boundary_value->first))
+        if (constraints.can_store_line(boundary_value.first) &&
+            !constraints.is_constrained(boundary_value.first))
           {
-            constraints.add_line(boundary_value->first);
-            constraints.set_inhomogeneity(boundary_value->first,
-                                          boundary_value->second);
+            constraints.add_line(boundary_value.first);
+            constraints.set_inhomogeneity(boundary_value.first,
+                                          boundary_value.second);
           }
       }
   }
@@ -522,8 +537,52 @@ namespace VectorTools
     const ComponentMask &             component_mask)
   {
     std::map<types::boundary_id, const Function<spacedim, number> *>
-      function_map;
-    function_map[boundary_component] = &boundary_function;
+      function_map = {{boundary_component, &boundary_function}};
+    interpolate_boundary_values(
+      mapping, dof, function_map, constraints, component_mask);
+  }
+
+
+
+  template <int dim, int spacedim, typename number>
+  void
+  interpolate_boundary_values(
+    const hp::MappingCollection<dim, spacedim> &mapping,
+    const DoFHandler<dim, spacedim> &           dof,
+    const std::map<types::boundary_id, const Function<spacedim, number> *>
+      &                        function_map,
+    AffineConstraints<number> &constraints,
+    const ComponentMask &      component_mask_)
+  {
+    std::map<types::global_dof_index, number> boundary_values;
+    interpolate_boundary_values(
+      mapping, dof, function_map, boundary_values, component_mask_);
+    for (const auto &boundary_value : boundary_values)
+      {
+        if (constraints.can_store_line(boundary_value.first) &&
+            !constraints.is_constrained(boundary_value.first))
+          {
+            constraints.add_line(boundary_value.first);
+            constraints.set_inhomogeneity(boundary_value.first,
+                                          boundary_value.second);
+          }
+      }
+  }
+
+
+
+  template <int dim, int spacedim, typename number>
+  void
+  interpolate_boundary_values(
+    const hp::MappingCollection<dim, spacedim> &mapping,
+    const DoFHandler<dim, spacedim> &           dof,
+    const types::boundary_id                    boundary_component,
+    const Function<spacedim, number> &          boundary_function,
+    AffineConstraints<number> &                 constraints,
+    const ComponentMask &                       component_mask)
+  {
+    std::map<types::boundary_id, const Function<spacedim, number> *>
+      function_map = {{boundary_component, &boundary_function}};
     interpolate_boundary_values(
       mapping, dof, function_map, constraints, component_mask);
   }

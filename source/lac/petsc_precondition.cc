@@ -748,9 +748,14 @@ namespace PETScWrappers
 
   /* ----------------- PreconditionBDDC -------------------- */
 
-  PreconditionBDDC::AdditionalData::AdditionalData(const bool use_edges,
+  PreconditionBDDC::AdditionalData::AdditionalData(const bool use_vertices,
+                                                   const bool use_edges,
                                                    const bool use_faces,
-                                                   const bool output_details)
+                                                   const bool symmetric)
+    : use_vertices(use_vertices)
+    , use_edges(use_edges)
+    , use_faces(use_faces)
+    , symmetric(symmetric)
   {}
 
   PreconditionBDDC::PreconditionBDDC(const MPI_Comm        comm,
@@ -777,31 +782,25 @@ namespace PETScWrappers
     AssertThrow(ierr == 0, ExcPETScError(ierr));
 
     // TODO: Add BDDC options, in particular the additional primal nodes
-    // set_option_value(
-    //     "-pc_hypre_boomeramg_agg_nl",
-    //     std::to_string(additional_data.aggressive_coarsening_num_levels));
+    std::stringstream ssStream;
 
-    // std::stringstream ssStream;
-    // ssStream << additional_data.max_row_sum;
-    // set_option_value("-pc_hypre_boomeramg_max_row_sum", ssStream.str());
+    if (additional_data.use_vertices)
+      set_option_value("-pc_bddc_use_vertices", "true");
+    else
+      set_option_value("-pc_bddc_use_vertices", "false");
+    if (additional_data.use_edges)
+      set_option_value("-pc_bddc_use_edges", "true");
+    else
+      set_option_value("-pc_bddc_use_edges", "false");
+    if (additional_data.use_faces)
+      set_option_value("-pc_bddc_use_faces", "true");
+    else
+      set_option_value("-pc_bddc_use_faces", "false");
+    if (additional_data.symmetric)
+      set_option_value("-pc_bddc_symmetric", "true");
+    else
+      set_option_value("-pc_bddc_symmetric", "false");
 
-    // ssStream.str(""); // empty the stringstream
-    // ssStream << additional_data.strong_threshold;
-    // set_option_value("-pc_hypre_boomeramg_strong_threshold", ssStream.str());
-
-    // if (additional_data.symmetric_operator) {
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_up",
-    //                    "symmetric-SOR/Jacobi");
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_down",
-    //                    "symmetric-SOR/Jacobi");
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_coarse",
-    //                    "Gaussian-elimination");
-    // } else {
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_up", "SOR/Jacobi");
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_down", "SOR/Jacobi");
-    //   set_option_value("-pc_hypre_boomeramg_relax_type_coarse",
-    //                    "Gaussian-elimination");
-    // }
 
     ierr = PCSetFromOptions(pc);
     AssertThrow(ierr == 0, ExcPETScError(ierr));

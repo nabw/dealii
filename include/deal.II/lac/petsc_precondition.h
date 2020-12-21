@@ -975,9 +975,10 @@ namespace PETScWrappers
        * Constructor. Note that BoomerAMG offers a lot more options to set
        * than what is exposed here.
        */
-      AdditionalData(const bool use_edges      = false,
-                     const bool use_faces      = false,
-                     const bool output_details = false);
+      AdditionalData(const bool use_vertices = false,
+                     const bool use_edges    = false,
+                     const bool use_faces    = false,
+                     const bool symmetric    = false);
     };
 
     /**

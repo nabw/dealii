@@ -975,10 +975,33 @@ namespace PETScWrappers
        * Constructor. Note that BoomerAMG offers a lot more options to set
        * than what is exposed here.
        */
-      AdditionalData(const bool use_vertices = false,
+      AdditionalData(const bool use_vertices = true,
                      const bool use_edges    = false,
                      const bool use_faces    = false,
                      const bool symmetric    = false);
+
+      /**
+       * This flag sets the use of degrees of freedom in the vertices of the
+       * subdomain as primal variables.
+       */
+      bool use_vertices;
+
+      /**
+       * This flag sets the use of degrees of freedom in the edges of the
+       * subdomain as primal variables.
+       */
+      bool use_edges;
+
+      /**
+       * This flag sets the use of degrees of freedom in the faces of the
+       * subdomain as primal variables.
+       */
+      bool use_faces;
+
+      /**
+       * Set whether the matrix is symmetric or not.
+       */
+      bool symmetric;
     };
 
     /**

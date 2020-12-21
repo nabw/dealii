@@ -560,9 +560,9 @@ namespace PETScWrappers
       // create the local to global mappings as arrays.
       IndexSet::size_type n_l2g_row = local_active_rows.n_elements();
       IndexSet::size_type n_l2g_col = local_active_columns.n_elements();
-      int                 idx_glob_row[n_l2g_row];
-      int                 idx_glob_col[n_l2g_col];
-      unsigned int        k = 0;
+      std::vector<int>    idx_glob_row(n_l2g_row);
+      std::vector<int>    idx_glob_col(n_l2g_row);
+      unsigned int        k;
       for (k = 0; k < n_l2g_row; ++k)
         {
           idx_glob_row[k] = local_active_rows.nth_index_in_set(k);
@@ -576,16 +576,22 @@ namespace PETScWrappers
       IS is_glob_row, is_glob_col;
       // Create row index set
       ISLocalToGlobalMapping l2gmap_row;
-      ISCreateGeneral(
-        communicator, n_l2g_row, idx_glob_row, PETSC_COPY_VALUES, &is_glob_row);
+      ISCreateGeneral(communicator,
+                      n_l2g_row,
+                      idx_glob_row.data(),
+                      PETSC_COPY_VALUES,
+                      &is_glob_row);
       ISLocalToGlobalMappingCreateIS(is_glob_row, &l2gmap_row);
       ISDestroy(&is_glob_row);
       ISLocalToGlobalMappingViewFromOptions(l2gmap_row, NULL, "-view_map");
 
       // Create column index set
       ISLocalToGlobalMapping l2gmap_col;
-      ISCreateGeneral(
-        communicator, n_l2g_col, idx_glob_col, PETSC_COPY_VALUES, &is_glob_col);
+      ISCreateGeneral(communicator,
+                      n_l2g_col,
+                      idx_glob_col.data(),
+                      PETSC_COPY_VALUES,
+                      &is_glob_col);
       ISLocalToGlobalMappingCreateIS(is_glob_col, &l2gmap_col);
       ISDestroy(&is_glob_col);
       ISLocalToGlobalMappingViewFromOptions(l2gmap_col, NULL, "-view_map");
@@ -664,8 +670,7 @@ namespace PETScWrappers
             }
 
           {
-            PetscInt *   ptr          = colnums_in_window.data();
-            unsigned int column_local = 0;
+            PetscInt *ptr = colnums_in_window.data();
             for (PetscInt i = local_row_start; i < local_row_end; ++i)
               {
                 global_row_index = local_active_rows.nth_index_in_set(i);

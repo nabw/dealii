@@ -48,7 +48,7 @@ ENABLE_IF_LINKS(DEAL_II_LINKER_FLAGS "-Wl,--as-needed")
 #
 # Set ansi mode:
 #
-ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-ansi")
+#ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-ansi")
 
 #
 # Enable verbose warnings:

@@ -149,7 +149,7 @@ namespace DoFTools
       /**
        * When restricting, on a face, the degrees of freedom of fe1 to the space
        * described by fe2 (for example for the complex case described
-       * in the @ref hp_paper "hp paper"), we have to select fe2.dofs_per_face
+       * in the @ref hp_paper "hp-paper"), we have to select fe2.dofs_per_face
        * out of the fe1.dofs_per_face face DoFs as the
        * primary dofs, and the rest become dependent dofs. This function selects
        * which ones will be primary, and which ones will be dependents.
@@ -395,7 +395,7 @@ namespace DoFTools
       /**
        * Given the face interpolation matrix between two elements, split it into
        * its primary and dependent parts and invert the primary part as
-       * explained in the @ref hp_paper "hp paper".
+       * explained in the @ref hp_paper "hp-paper".
        */
       void
       ensure_existence_of_split_face_matrix(
@@ -457,7 +457,7 @@ namespace DoFTools
 
       /**
        * A function that returns how many different finite elements a dof
-       * handler uses. This is one for non-hp DoFHandlers and
+       * handler uses. This is one for non-hp-DoFHandlers and
        * dof_handler.get_fe().size() for the hp-versions.
        */
       template <int dim, int spacedim>
@@ -476,7 +476,7 @@ namespace DoFTools
        * Copy constraints into an AffineConstraints object.
        *
        * This function removes zero constraints and those, which constrain a DoF
-       * which was already eliminated in one of the previous steps of the hp
+       * which was already eliminated in one of the previous steps of the hp-
        * hanging node procedure.
        *
        * It also suppresses very small entries in the AffineConstraints object
@@ -512,43 +512,62 @@ namespace DoFTools
         for (unsigned int row = 0; row != n_dependent_dofs; ++row)
           if (constraints.is_constrained(dependent_dofs[row]) == false)
             {
-              bool constraint_already_satisfied = false;
+              // Check if we have an identity constraint, i.e.,
+              // something of the form
+              //   U(dependent_dof[row])==U(primary_dof[row]),
+              // where
+              //   dependent_dof[row] == primary_dof[row].
+              // This can happen in the hp context where we have previously
+              // unified DoF indices, for example, the middle node on the
+              // face of a Q4 element will have gotten the same index
+              // as the middle node of the Q2 element on the neighbor
+              // cell. But because the other Q4 nodes will still have to be
+              // constrained, so the middle node shows up again here.
+              //
+              // If we find such a constraint, then it is trivially
+              // satisfied, and we can move on to the next dependent
+              // DoF (row). The only thing we should make sure is that the
+              // row of the matrix really just contains this one entry.
+              {
+                bool is_trivial_constraint = false;
 
-              // Check if we have an identity constraint, which is already
-              // satisfied by unification of the corresponding global dof
-              // indices
+                for (unsigned int i = 0; i < n_primary_dofs; ++i)
+                  if (face_constraints(row, i) == 1.0)
+                    if (dependent_dofs[row] == primary_dofs[i])
+                      {
+                        is_trivial_constraint = true;
+
+                        for (unsigned int ii = 0; ii < n_primary_dofs; ++ii)
+                          if (ii != i)
+                            Assert(face_constraints(row, ii) == 0.0,
+                                   ExcInternalError());
+
+                        break;
+                      }
+
+                if (is_trivial_constraint == true)
+                  continue;
+              }
+              // add up the absolute values of all constraints in this line
+              // to get a measure of their absolute size
+              number1 abs_sum = 0;
               for (unsigned int i = 0; i < n_primary_dofs; ++i)
-                if (face_constraints(row, i) == 1.0)
-                  if (primary_dofs[i] == dependent_dofs[row])
-                    {
-                      constraint_already_satisfied = true;
-                      break;
-                    }
+                abs_sum += std::abs(face_constraints(row, i));
 
-              if (constraint_already_satisfied == false)
-                {
-                  // add up the absolute values of all constraints in this line
-                  // to get a measure of their absolute size
-                  number1 abs_sum = 0;
-                  for (unsigned int i = 0; i < n_primary_dofs; ++i)
-                    abs_sum += std::abs(face_constraints(row, i));
-
-                  // then enter those constraints that are larger than
-                  // 1e-14*abs_sum. everything else probably originated from
-                  // inexact inversion of matrices and similar effects. having
-                  // those constraints in here will only lead to problems
-                  // because it makes sparsity patterns fuller than necessary
-                  // without producing any significant effect
-                  constraints.add_line(dependent_dofs[row]);
-                  for (unsigned int i = 0; i < n_primary_dofs; ++i)
-                    if ((face_constraints(row, i) != 0) &&
-                        (std::fabs(face_constraints(row, i)) >=
-                         1e-14 * abs_sum))
-                      constraints.add_entry(dependent_dofs[row],
-                                            primary_dofs[i],
-                                            face_constraints(row, i));
-                  constraints.set_inhomogeneity(dependent_dofs[row], 0.);
-                }
+              // then enter those constraints that are larger than
+              // 1e-14*abs_sum. everything else probably originated from
+              // inexact inversion of matrices and similar effects. having
+              // those constraints in here will only lead to problems
+              // because it makes sparsity patterns fuller than necessary
+              // without producing any significant effect
+              constraints.add_line(dependent_dofs[row]);
+              for (unsigned int i = 0; i < n_primary_dofs; ++i)
+                if ((face_constraints(row, i) != 0) &&
+                    (std::fabs(face_constraints(row, i)) >= 1e-14 * abs_sum))
+                  constraints.add_entry(dependent_dofs[row],
+                                        primary_dofs[i],
+                                        face_constraints(row, i));
+              constraints.set_inhomogeneity(dependent_dofs[row], 0.);
             }
       }
 
@@ -646,7 +665,7 @@ namespace DoFTools
           for (const unsigned int face : cell->face_indices())
             if (cell->face(face)->has_children())
               {
-                // in any case, faces can have at most two active fe indices,
+                // in any case, faces can have at most two active FE indices,
                 // but here the face can have only one (namely the same as that
                 // from the cell we're sitting on), and each of the children can
                 // have only one as well. check this
@@ -664,7 +683,7 @@ namespace DoFTools
                            ExcInternalError());
 
                 // right now, all that is implemented is the case that both
-                // sides use the same fe
+                // sides use the same FE
                 for (unsigned int c = 0; c < cell->face(face)->n_children();
                      ++c)
                   if (!cell->neighbor_child_on_subface(face, c)
@@ -747,7 +766,7 @@ namespace DoFTools
             else
               {
                 // this face has no children, but it could still be that it is
-                // shared by two cells that use a different fe index. check a
+                // shared by two cells that use a different FE index. check a
                 // couple of things, but ignore the case that the neighbor is an
                 // artificial cell
                 if (!cell->at_boundary(face) &&
@@ -808,7 +827,7 @@ namespace DoFTools
                          RefinementCase<dim - 1>::isotropic_refinement,
                        ExcNotImplemented());
 
-                // in any case, faces can have at most two active fe indices,
+                // in any case, faces can have at most two active FE indices,
                 // but here the face can have only one (namely the same as that
                 // from the cell we're sitting on), and each of the children can
                 // have only one as well. check this
@@ -825,7 +844,7 @@ namespace DoFTools
 
                 // right now, all that is implemented is the case that both
                 // sides use the same fe, and not only that but also that all
-                // lines bounding this face and the children have the same fe
+                // lines bounding this face and the children have the same FE
                 for (unsigned int c = 0; c < cell->face(face)->n_children();
                      ++c)
                   if (!cell->neighbor_child_on_subface(face, c)
@@ -991,7 +1010,7 @@ namespace DoFTools
             else
               {
                 // this face has no children, but it could still be that it is
-                // shared by two cells that use a different fe index. check a
+                // shared by two cells that use a different FE index. check a
                 // couple of things, but ignore the case that the neighbor is an
                 // artificial cell
                 if (!cell->at_boundary(face) &&
@@ -1016,7 +1035,7 @@ namespace DoFTools
       AffineConstraints<number> &      constraints)
     {
       // note: this function is going to be hard to understand if you haven't
-      // read the hp paper. however, we try to follow the notation laid out
+      // read the hp-paper. however, we try to follow the notation laid out
       // there, so go read the paper before you try to understand what is going
       // on here
 
@@ -1046,7 +1065,7 @@ namespace DoFTools
       // primary and dependent parts, and for which the primary part is
       // inverted. these two matrices are derived from the face interpolation
       // matrix
-      // as described in the @ref hp_paper "hp paper"
+      // as described in the @ref hp_paper "hp-paper"
       Table<2,
             std::unique_ptr<std::pair<FullMatrix<double>, FullMatrix<double>>>>
         split_face_interpolation_matrices(n_finite_elements(dof_handler),
@@ -1086,7 +1105,7 @@ namespace DoFTools
                 // so now we've found a face of an active cell that has
                 // children. that means that there are hanging nodes here.
 
-                // in any case, faces can have at most two sets of active fe
+                // in any case, faces can have at most two sets of active FE
                 // indices, but here the face can have only one (namely the same
                 // as that from the cell we're sitting on), and each of the
                 // children can have only one as well. check this
@@ -1104,7 +1123,7 @@ namespace DoFTools
                            ExcInternalError());
 
                 // first find out whether we can constrain each of the subfaces
-                // to the mother face. in the lingo of the hp paper, this would
+                // to the mother face. in the lingo of the hp-paper, this would
                 // be the simple case. note that we can short-circuit this
                 // decision if the dof_handler doesn't support hp at all
                 //
@@ -1142,7 +1161,7 @@ namespace DoFTools
                     case FiniteElementDomination::either_element_can_dominate:
                       {
                         // Case 1 (the simple case and the only case that can
-                        // happen for non-hp DoFHandlers): The coarse element
+                        // happen for non-hp-DoFHandlers): The coarse element
                         // dominates the elements on the subfaces (or they are
                         // all the same)
                         //
@@ -1255,10 +1274,10 @@ namespace DoFTools
                       {
                         // Case 2 (the "complex" case): at least one (the
                         // neither_... case) of the finer elements or all of
-                        // them (the other_... case) is dominating. See the hp
+                        // them (the other_... case) is dominating. See the hp-
                         // paper for a way how to deal with this situation
                         //
-                        // since this is something that can only happen for hp
+                        // since this is something that can only happen for hp-
                         // dof handlers, add a check here...
                         Assert(dof_handler.has_hp_capabilities() == true,
                                ExcInternalError());
@@ -1389,7 +1408,7 @@ namespace DoFTools
 
 
                         // next we have to deal with the subfaces. do as
-                        // discussed in the hp paper
+                        // discussed in the hp-paper
                         for (unsigned int sf = 0;
                              sf < cell->face(face)->n_children();
                              ++sf)
@@ -1466,7 +1485,7 @@ namespace DoFTools
             else
               {
                 // this face has no children, but it could still be that it is
-                // shared by two cells that use a different fe index
+                // shared by two cells that use a different FE index
                 Assert(cell->face(face)->fe_index_is_active(
                          cell->active_fe_index()) == true,
                        ExcInternalError());
@@ -1474,12 +1493,12 @@ namespace DoFTools
                 // see if there is a neighbor that is an artificial cell. in
                 // that case, we're not interested in this interface. we test
                 // this case first since artificial cells may not have an
-                // active_fe_index set, etc
+                // active FE index set, etc
                 if (!cell->at_boundary(face) &&
                     cell->neighbor(face)->is_artificial())
                   continue;
 
-                // Only if there is a neighbor with a different active_fe_index
+                // Only if there is a neighbor with a different active FE index
                 // and the same h-level, some action has to be taken.
                 if ((dof_handler.has_hp_capabilities()) &&
                     !cell->face(face)->at_boundary() &&
@@ -1581,7 +1600,7 @@ namespace DoFTools
                             // our best bet is to find the common space among
                             // other FEs in FECollection and then constrain both
                             // FEs to that one. More precisely, we follow the
-                            // strategy outlined on page 17 of the hp paper:
+                            // strategy outlined on page 17 of the hp-paper:
                             // First we find the dominant FE space S. Then we
                             // divide our dofs in primary and dependent such
                             // that I^{face,primary}_{S^{face}->S} is
@@ -3156,7 +3175,7 @@ namespace DoFTools
     Assert(coarse_grid.get_fe_collection().size() == 1 &&
              fine_grid.get_fe_collection().size() == 1,
            ExcMessage("This function is not yet implemented for DoFHandlers "
-                      "using hp capabilities."));
+                      "using hp-capabilities."));
     // store the weights with which a dof on the parameter grid contributes to a
     // dof on the fine grid. see the long doc below for more info
     //
@@ -3340,7 +3359,7 @@ namespace DoFTools
     Assert(coarse_grid.get_fe_collection().size() == 1 &&
              fine_grid.get_fe_collection().size() == 1,
            ExcMessage("This function is not yet implemented for DoFHandlers "
-                      "using hp capabilities."));
+                      "using hp-capabilities."));
     // store the weights with which a dof on the parameter grid contributes to a
     // dof on the fine grid. see the long doc below for more info
     //

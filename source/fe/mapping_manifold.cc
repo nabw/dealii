@@ -163,7 +163,7 @@ MappingManifold<dim, spacedim>::transform_real_to_unit_cell(
   const Point<spacedim> &) const
 {
   Assert(false, ExcNotImplemented());
-  return Point<dim>();
+  return {};
 }
 
 
@@ -282,16 +282,19 @@ MappingManifold<dim, spacedim>::get_data(const UpdateFlags      update_flags,
 template <int dim, int spacedim>
 std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase>
 MappingManifold<dim, spacedim>::get_face_data(
-  const UpdateFlags          update_flags,
-  const Quadrature<dim - 1> &quadrature) const
+  const UpdateFlags               update_flags,
+  const hp::QCollection<dim - 1> &quadrature) const
 {
+  AssertDimension(quadrature.size(), 1);
+
   std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase> data_ptr =
     std::make_unique<InternalData>();
   auto &data = dynamic_cast<InternalData &>(*data_ptr);
   data.initialize_face(this->requires_update_flags(update_flags),
                        QProjector<dim>::project_to_all_faces(
-                         ReferenceCell::get_hypercube(dim), quadrature),
-                       quadrature.size());
+                         ReferenceCell::Type::get_hypercube<dim>(),
+                         quadrature[0]),
+                       quadrature[0].size());
 
   return data_ptr;
 }
@@ -309,7 +312,7 @@ MappingManifold<dim, spacedim>::get_subface_data(
   auto &data = dynamic_cast<InternalData &>(*data_ptr);
   data.initialize_face(this->requires_update_flags(update_flags),
                        QProjector<dim>::project_to_all_subfaces(
-                         ReferenceCell::get_hypercube(dim), quadrature),
+                         ReferenceCell::Type::get_hypercube<dim>(), quadrature),
                        quadrature.size());
 
   return data_ptr;
@@ -1208,11 +1211,13 @@ void
 MappingManifold<dim, spacedim>::fill_fe_face_values(
   const typename Triangulation<dim, spacedim>::cell_iterator &cell,
   const unsigned int                                          face_no,
-  const Quadrature<dim - 1> &                                 quadrature,
+  const hp::QCollection<dim - 1> &                            quadrature,
   const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
   internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
     &output_data) const
 {
+  AssertDimension(quadrature.size(), 1);
+
   // ensure that the following cast is really correct:
   Assert((dynamic_cast<const InternalData *>(&internal_data) != nullptr),
          ExcInternalError());
@@ -1223,13 +1228,14 @@ MappingManifold<dim, spacedim>::fill_fe_face_values(
     cell,
     face_no,
     numbers::invalid_unsigned_int,
-    QProjector<dim>::DataSetDescriptor::face(ReferenceCell::get_hypercube(dim),
-                                             face_no,
-                                             cell->face_orientation(face_no),
-                                             cell->face_flip(face_no),
-                                             cell->face_rotation(face_no),
-                                             quadrature.size()),
-    quadrature,
+    QProjector<dim>::DataSetDescriptor::face(
+      ReferenceCell::Type::get_hypercube<dim>(),
+      face_no,
+      cell->face_orientation(face_no),
+      cell->face_flip(face_no),
+      cell->face_rotation(face_no),
+      quadrature[0].size()),
+    quadrature[0],
     data,
     output_data);
 }
@@ -1257,15 +1263,15 @@ MappingManifold<dim, spacedim>::fill_fe_subface_values(
     cell,
     face_no,
     subface_no,
-    QProjector<dim>::DataSetDescriptor::subface(ReferenceCell::get_hypercube(
-                                                  dim),
-                                                face_no,
-                                                subface_no,
-                                                cell->face_orientation(face_no),
-                                                cell->face_flip(face_no),
-                                                cell->face_rotation(face_no),
-                                                quadrature.size(),
-                                                cell->subface_case(face_no)),
+    QProjector<dim>::DataSetDescriptor::subface(
+      ReferenceCell::Type::get_hypercube<dim>(),
+      face_no,
+      subface_no,
+      cell->face_orientation(face_no),
+      cell->face_flip(face_no),
+      cell->face_rotation(face_no),
+      quadrature.size(),
+      cell->subface_case(face_no)),
     quadrature,
     data,
     output_data);

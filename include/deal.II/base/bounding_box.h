@@ -23,14 +23,6 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/utilities.h>
 
-DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
-#include <boost/geometry/algorithms/envelope.hpp>
-#include <boost/geometry/geometries/multi_point.hpp>
-#if DEAL_II_BOOST_VERSION_GTE(1, 75, 0)
-#  include <boost/geometry/strategies/envelope/cartesian.hpp>
-#endif
-DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
-
 DEAL_II_NAMESPACE_OPEN
 
 /**
@@ -166,6 +158,18 @@ public:
   get_boundary_points() const;
 
   /**
+   * Test for equality.
+   */
+  bool
+  operator==(const BoundingBox<spacedim, Number> &box) const;
+
+  /**
+   * Test for inequality.
+   */
+  bool
+  operator!=(const BoundingBox<spacedim, Number> &box) const;
+
+  /**
    * Check if the current object and @p other_bbox are neighbors, i.e. if the boxes
    * have dimension spacedim, check if their intersection is non empty.
    *
@@ -289,7 +293,9 @@ public:
   unit_to_real(const Point<spacedim, Number> &point) const;
 
   /**
-   * Boost serialization function
+   * Write or read the data of this object to or from a stream for the
+   * purpose of serialization using the [BOOST serialization
+   * library](https://www.boost.org/doc/libs/1_74_0/libs/serialization/doc/index.html).
    */
   template <class Archive>
   void
@@ -407,10 +413,64 @@ template <int spacedim, typename Number>
 template <class Container>
 inline BoundingBox<spacedim, Number>::BoundingBox(const Container &points)
 {
-  boost::geometry::envelope(
-    boost::geometry::model::multi_point<Point<spacedim, Number>>(points.begin(),
-                                                                 points.end()),
-    *this);
+  // Use the default constructor in case points is empty instead of setting
+  // things to +oo and -oo
+  if (points.size() > 0)
+    {
+      auto &min = boundary_points.first;
+      auto &max = boundary_points.second;
+      std::fill(min.begin_raw(),
+                min.end_raw(),
+                std::numeric_limits<Number>::infinity());
+      std::fill(max.begin_raw(),
+                max.end_raw(),
+                -std::numeric_limits<Number>::infinity());
+
+      for (const Point<spacedim, Number> &point : points)
+        for (unsigned int d = 0; d < spacedim; ++d)
+          {
+            min[d] = std::min(min[d], point[d]);
+            max[d] = std::max(max[d], point[d]);
+          }
+    }
+}
+
+
+
+template <int spacedim, typename Number>
+inline std::pair<Point<spacedim, Number>, Point<spacedim, Number>> &
+BoundingBox<spacedim, Number>::get_boundary_points()
+{
+  return this->boundary_points;
+}
+
+
+
+template <int spacedim, typename Number>
+inline const std::pair<Point<spacedim, Number>, Point<spacedim, Number>> &
+BoundingBox<spacedim, Number>::get_boundary_points() const
+{
+  return this->boundary_points;
+}
+
+
+
+template <int spacedim, typename Number>
+inline bool
+BoundingBox<spacedim, Number>::
+operator==(const BoundingBox<spacedim, Number> &box) const
+{
+  return boundary_points == box.boundary_points;
+}
+
+
+
+template <int spacedim, typename Number>
+inline bool
+BoundingBox<spacedim, Number>::
+operator!=(const BoundingBox<spacedim, Number> &box) const
+{
+  return boundary_points != box.boundary_points;
 }
 
 

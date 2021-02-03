@@ -551,7 +551,8 @@ namespace internal
             for (auto cell_id : i.second)
               {
                 typename MeshType::cell_iterator cell(
-                  *cell_id_translator.to_cell_id(cell_id).to_cell(tria_dst),
+                  *tria_dst.create_cell_iterator(
+                    cell_id_translator.to_cell_id(cell_id)),
                   &dof_handler_dst);
 
                 cell->get_dof_indices(indices);
@@ -580,8 +581,8 @@ namespace internal
           {
             const auto cell_id = cell_id_translator.to_cell_id(id);
 
-            typename MeshType::cell_iterator cell_(*cell_id.to_cell(tria_dst),
-                                                   &dof_handler_dst);
+            typename MeshType::cell_iterator cell_(
+              *tria_dst.create_cell_iterator(cell_id), &dof_handler_dst);
 
             cell_->get_dof_indices(indices);
 
@@ -695,7 +696,8 @@ namespace internal
           if (is_cell_locally_owned)
             {
               (typename MeshType::cell_iterator(
-                 *cell->id().to_cell(mesh_fine.get_triangulation()),
+                 *mesh_fine.get_triangulation().create_cell_iterator(
+                   cell->id()),
                  &mesh_fine))
                 ->get_dof_indices(dof_indices);
             }
@@ -732,7 +734,8 @@ namespace internal
           if (is_cell_locally_owned)
             {
               (typename MeshType::cell_iterator(
-                 *cell->id().to_cell(mesh_fine.get_triangulation()),
+                 *mesh_fine.get_triangulation().create_cell_iterator(
+                   cell->id()),
                  &mesh_fine))
                 ->child(c)
                 ->get_dof_indices(dof_indices);
@@ -948,7 +951,7 @@ namespace internal
         dof_handler_coarse.get_fe(0).dofs_per_cell *
         GeometryInfo<dim>::max_children_per_cell;
 
-      // degree of fe on coarse and fine cell
+      // degree of FE on coarse and fine cell
       transfer.schemes[0].degree_coarse   = transfer.schemes[0].degree_fine =
         transfer.schemes[1].degree_coarse = dof_handler_coarse.get_fe(0).degree;
       transfer.schemes[1].degree_fine =

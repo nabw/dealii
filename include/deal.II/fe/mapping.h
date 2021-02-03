@@ -26,6 +26,8 @@
 
 #include <deal.II/grid/tria.h>
 
+#include <deal.II/hp/q_collection.h>
+
 #include <array>
 #include <cmath>
 #include <memory>
@@ -373,11 +375,11 @@ public:
    * displacements or choose completely different locations, e.g.,
    * MappingQEulerian, MappingQ1Eulerian, or MappingFEField.
    *
-   * This function returns the bounding box containing all the vertices of the
-   * cell, as returned by the get_vertices() method. Beware of the fact that
-   * for higher order mappings this bounding box is only an approximation of the
-   * true bounding box, since it does not take into account curved faces, and it
-   * may be smaller than the true bounding box.
+   * For linear mappings, this function returns the bounding box containing all
+   * the vertices of the cell, as returned by the get_vertices() method. For
+   * higher order mappings defined through support points, the bounding box is
+   * only guaranteed to contain all the support points, and it is, in general,
+   * only an approximation of the true bounding box, which may be larger.
    *
    * @param[in] cell The cell for which you want to compute the bounding box
    */
@@ -398,6 +400,13 @@ public:
    */
   virtual bool
   preserves_vertex_locations() const = 0;
+
+  /**
+   * Returns if this instance of Mapping is compatible with the type of cell
+   * in @p cell_type.
+   */
+  virtual bool
+  is_compatible_with(const ReferenceCell::Type &cell_type) const = 0;
 
   /**
    * @name Mapping points between reference and real cells
@@ -757,8 +766,15 @@ protected:
    * the returned object, knowing its real (derived) type.
    */
   virtual std::unique_ptr<InternalDataBase>
+  get_face_data(const UpdateFlags               update_flags,
+                const hp::QCollection<dim - 1> &quadrature) const;
+
+  /**
+   * @deprecated Use the version taking a hp::QCollection argument.
+   */
+  virtual std::unique_ptr<InternalDataBase>
   get_face_data(const UpdateFlags          update_flags,
-                const Quadrature<dim - 1> &quadrature) const = 0;
+                const Quadrature<dim - 1> &quadrature) const;
 
   /**
    * Like get_data() and get_face_data(), but in preparation for later calls
@@ -912,10 +928,22 @@ protected:
   fill_fe_face_values(
     const typename Triangulation<dim, spacedim>::cell_iterator &cell,
     const unsigned int                                          face_no,
-    const Quadrature<dim - 1> &                                 quadrature,
+    const hp::QCollection<dim - 1> &                            quadrature,
     const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
     dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
-      &output_data) const = 0;
+      &output_data) const;
+
+  /**
+   * @deprecated Use the version taking a hp::QCollection argument.
+   */
+  virtual void
+  fill_fe_face_values(
+    const typename Triangulation<dim, spacedim>::cell_iterator &cell,
+    const unsigned int                                          face_no,
+    const Quadrature<dim - 1> &                                 quadrature,
+    const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
+    internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
+      &output_data) const;
 
   /**
    * This function is the equivalent to Mapping::fill_fe_values(), but for

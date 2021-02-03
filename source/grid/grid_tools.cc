@@ -18,6 +18,8 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/thread_management.h>
 
+#include <deal.II/distributed/fully_distributed_tria.h>
+#include <deal.II/distributed/p4est_wrappers.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
 
@@ -1208,10 +1210,9 @@ namespace GridTools
 
     // If the triangulation is distributed, we need to
     // exchange the moved vertices across mpi processes
-    if (parallel::distributed::Triangulation<dim, spacedim>
-          *distributed_triangulation =
-            dynamic_cast<parallel::distributed::Triangulation<dim, spacedim> *>(
-              &triangulation))
+    if (auto distributed_triangulation =
+          dynamic_cast<parallel::DistributedTriangulationBase<dim, spacedim> *>(
+            &triangulation))
       {
         const std::vector<bool> locally_owned_vertices =
           get_locally_owned_vertices(triangulation);
@@ -1248,13 +1249,8 @@ namespace GridTools
                 }
             }
 
-#ifdef DEAL_II_WITH_P4EST
         distributed_triangulation->communicate_locally_moved_vertices(
           locally_owned_vertices);
-#else
-        (void)distributed_triangulation;
-        Assert(false, ExcInternalError());
-#endif
       }
     else
       // if this is a sequential triangulation, we could in principle
@@ -1545,27 +1541,23 @@ namespace GridTools
               // (possibly) coarser neighbor. if this is the case,
               // then we need to also add this neighbor
               if (dim >= 2)
-                for (unsigned int vface = 0; vface < dim; vface++)
-                  {
-                    const unsigned int face =
-                      GeometryInfo<dim>::vertex_to_face[v][vface]; // TODO
-
-                    if (!cell->at_boundary(face) &&
-                        cell->neighbor(face)->is_active())
-                      {
-                        // there is a (possibly) coarser cell behind a
-                        // face to which the vertex belongs. the
-                        // vertex we are looking at is then either a
-                        // vertex of that coarser neighbor, or it is a
-                        // hanging node on one of the faces of that
-                        // cell. in either case, it is adjacent to the
-                        // vertex, so add it to the list as well (if
-                        // the cell was already in the list then the
-                        // std::set makes sure that we get it only
-                        // once)
-                        adjacent_cells.insert(cell->neighbor(face));
-                      }
-                  }
+                for (const auto face :
+                     cell->reference_cell_type().faces_for_given_vertex(v))
+                  if (!cell->at_boundary(face) &&
+                      cell->neighbor(face)->is_active())
+                    {
+                      // there is a (possibly) coarser cell behind a
+                      // face to which the vertex belongs. the
+                      // vertex we are looking at is then either a
+                      // vertex of that coarser neighbor, or it is a
+                      // hanging node on one of the faces of that
+                      // cell. in either case, it is adjacent to the
+                      // vertex, so add it to the list as well (if
+                      // the cell was already in the list then the
+                      // std::set makes sure that we get it only
+                      // once)
+                      adjacent_cells.insert(cell->neighbor(face));
+                    }
 
               // in any case, we have found a cell, so go to the next cell
               goto next_cell;
@@ -2251,20 +2243,20 @@ namespace GridTools
       vertex_to_cell_map(triangulation);
 
     // Create a local index for the locally "owned" vertices
-    types::global_vertex_index next_index = 0;
-    unsigned int max_cellid_size = 0;
+    types::global_vertex_index next_index      = 0;
+    unsigned int               max_cellid_size = 0;
     std::set<std::pair<types::subdomain_id, types::global_vertex_index>>
-      vertices_added;
+                                                          vertices_added;
     std::map<types::subdomain_id, std::set<unsigned int>> vertices_to_recv;
     std::map<types::subdomain_id,
              std::vector<std::tuple<types::global_vertex_index,
                                     types::global_vertex_index,
                                     std::string>>>
-      vertices_to_send;
+                         vertices_to_send;
     active_cell_iterator cell = triangulation.begin_active(),
                          endc = triangulation.end();
     std::set<active_cell_iterator> missing_vert_cells;
-    std::set<unsigned int> used_vertex_index;
+    std::set<unsigned int>         used_vertex_index;
     for (; cell != endc; ++cell)
       {
         if (cell->is_locally_owned())
@@ -2274,7 +2266,7 @@ namespace GridTools
                 types::subdomain_id lowest_subdomain_id = cell->subdomain_id();
                 typename std::set<active_cell_iterator>::iterator
                   adjacent_cell = vertex_to_cell[cell->vertex_index(i)].begin(),
-                  end_adj_cell = vertex_to_cell[cell->vertex_index(i)].end();
+                  end_adj_cell  = vertex_to_cell[cell->vertex_index(i)].end();
                 for (; adjacent_cell != end_adj_cell; ++adjacent_cell)
                   lowest_subdomain_id =
                     std::min(lowest_subdomain_id,
@@ -2373,7 +2365,7 @@ namespace GridTools
     // Make indices global by getting the number of vertices owned by each
     // processors and shifting the indices accordingly
     types::global_vertex_index shift = 0;
-    int ierr = MPI_Exscan(&next_index,
+    int                        ierr  = MPI_Exscan(&next_index,
                           &shift,
                           1,
                           DEAL_II_VERTEX_INDEX_MPI_TYPE,
@@ -2382,7 +2374,7 @@ namespace GridTools
     AssertThrowMPI(ierr);
 
     std::map<unsigned int, types::global_vertex_index>::iterator
-      global_index_it = local_to_global_vertex_index.begin(),
+      global_index_it  = local_to_global_vertex_index.begin(),
       global_index_end = local_to_global_vertex_index.end();
     for (; global_index_it != global_index_end; ++global_index_it)
       global_index_it->second += shift;
@@ -2406,14 +2398,14 @@ namespace GridTools
                       std::vector<std::tuple<types::global_vertex_index,
                                              types::global_vertex_index,
                                              std::string>>>::iterator
-      vert_to_send_it = vertices_to_send.begin(),
+      vert_to_send_it  = vertices_to_send.begin(),
       vert_to_send_end = vertices_to_send.end();
     for (unsigned int i = 0; vert_to_send_it != vert_to_send_end;
          ++vert_to_send_it, ++i)
       {
-        int destination = vert_to_send_it->first;
-        const unsigned int n_vertices = vert_to_send_it->second.size();
-        const int buffer_size = 2 * n_vertices;
+        int                destination = vert_to_send_it->first;
+        const unsigned int n_vertices  = vert_to_send_it->second.size();
+        const int          buffer_size = 2 * n_vertices;
         vertices_send_buffers[i].resize(buffer_size);
 
         // fill the buffer
@@ -2441,14 +2433,14 @@ namespace GridTools
     std::vector<std::vector<types::global_vertex_index>> vertices_recv_buffers(
       vertices_to_recv.size());
     typename std::map<types::subdomain_id, std::set<unsigned int>>::iterator
-      vert_to_recv_it = vertices_to_recv.begin(),
+      vert_to_recv_it  = vertices_to_recv.begin(),
       vert_to_recv_end = vertices_to_recv.end();
     for (unsigned int i = 0; vert_to_recv_it != vert_to_recv_end;
          ++vert_to_recv_it, ++i)
       {
-        int source = vert_to_recv_it->first;
-        const unsigned int n_vertices = vert_to_recv_it->second.size();
-        const int buffer_size = 2 * n_vertices;
+        int                source      = vert_to_recv_it->first;
+        const unsigned int n_vertices  = vert_to_recv_it->second.size();
+        const int          buffer_size = 2 * n_vertices;
         vertices_recv_buffers[i].resize(buffer_size);
 
         // Receive the message
@@ -2471,9 +2463,9 @@ namespace GridTools
     for (unsigned int i = 0; vert_to_send_it != vert_to_send_end;
          ++vert_to_send_it, ++i)
       {
-        int destination = vert_to_send_it->first;
-        const unsigned int n_vertices = vert_to_send_it->second.size();
-        const int buffer_size = max_cellid_size * n_vertices;
+        int                destination = vert_to_send_it->first;
+        const unsigned int n_vertices  = vert_to_send_it->second.size();
+        const int          buffer_size = max_cellid_size * n_vertices;
         cellids_send_buffers[i].resize(buffer_size);
 
         // fill the buffer
@@ -2510,9 +2502,9 @@ namespace GridTools
     for (unsigned int i = 0; vert_to_recv_it != vert_to_recv_end;
          ++vert_to_recv_it, ++i)
       {
-        int source = vert_to_recv_it->first;
-        const unsigned int n_vertices = vert_to_recv_it->second.size();
-        const int buffer_size = max_cellid_size * n_vertices;
+        int                source      = vert_to_recv_it->first;
+        const unsigned int n_vertices  = vert_to_recv_it->second.size();
+        const int          buffer_size = max_cellid_size * n_vertices;
         cellids_recv_buffers[i].resize(buffer_size);
 
         // Receive the message
@@ -2542,7 +2534,7 @@ namespace GridTools
               &cellids_recv_buffers[i][max_cellid_size * j] + max_cellid_size);
             bool found = false;
             typename std::set<active_cell_iterator>::iterator
-              cell_set_it = missing_vert_cells.begin(),
+              cell_set_it  = missing_vert_cells.begin(),
               end_cell_set = missing_vert_cells.end();
             for (; (found == false) && (cell_set_it != end_cell_set);
                  ++cell_set_it)
@@ -3035,6 +3027,101 @@ namespace GridTools
   }
 
 
+
+  template <int dim, int spacedim>
+  std::vector<types::subdomain_id>
+  get_subdomain_association(const Triangulation<dim, spacedim> &triangulation,
+                            const std::vector<CellId> &         cell_ids)
+  {
+    std::vector<types::subdomain_id> subdomain_ids;
+    subdomain_ids.reserve(cell_ids.size());
+
+    if (dynamic_cast<
+          const parallel::fullydistributed::Triangulation<dim, spacedim> *>(
+          &triangulation) != nullptr)
+      {
+        Assert(false, ExcNotImplemented());
+      }
+    else if (const parallel::distributed::Triangulation<dim, spacedim>
+               *parallel_tria = dynamic_cast<
+                 const parallel::distributed::Triangulation<dim, spacedim> *>(
+                 &triangulation))
+      {
+#ifndef DEAL_II_WITH_P4EST
+        Assert(
+          false,
+          ExcMessage(
+            "You are attempting to use a functionality that is only available "
+            "if deal.II was configured to use p4est, but cmake did not find a "
+            "valid p4est library."));
+#else
+        // for parallel distributed triangulations, we will ask the p4est oracle
+        // about the global partitioning of active cells since this information
+        // is stored on every process
+        for (const auto &cell_id : cell_ids)
+          {
+            // find descendent from coarse quadrant
+            typename dealii::internal::p4est::types<dim>::quadrant p4est_cell,
+              p4est_children[GeometryInfo<dim>::max_children_per_cell];
+
+            dealii::internal::p4est::init_coarse_quadrant<dim>(p4est_cell);
+            for (const auto &child_index : cell_id.get_child_indices())
+              {
+                dealii::internal::p4est::init_quadrant_children<dim>(
+                  p4est_cell, p4est_children);
+                p4est_cell =
+                  p4est_children[static_cast<unsigned int>(child_index)];
+              }
+
+            // find owning process, i.e., the subdomain id
+            const int owner =
+              dealii::internal::p4est::functions<dim>::comm_find_owner(
+                const_cast<typename dealii::internal::p4est::types<dim>::forest
+                             *>(parallel_tria->get_p4est()),
+                cell_id.get_coarse_cell_id(),
+                &p4est_cell,
+                Utilities::MPI::this_mpi_process(
+                  parallel_tria->get_communicator()));
+
+            Assert(owner >= 0, ExcMessage("p4est should know the owner."));
+
+            subdomain_ids.push_back(owner);
+          }
+#endif
+      }
+    else if (const parallel::shared::Triangulation<dim, spacedim> *shared_tria =
+               dynamic_cast<const parallel::shared::Triangulation<dim, spacedim>
+                              *>(&triangulation))
+      {
+        // for parallel shared triangulations, we need to access true subdomain
+        // ids which are also valid for artificial cells
+        const std::vector<types::subdomain_id> &true_subdomain_ids_of_cells =
+          shared_tria->get_true_subdomain_ids_of_cells();
+
+        for (const auto &cell_id : cell_ids)
+          {
+            const unsigned int active_cell_index =
+              shared_tria->create_cell_iterator(cell_id)->active_cell_index();
+            subdomain_ids.push_back(
+              true_subdomain_ids_of_cells[active_cell_index]);
+          }
+      }
+    else
+      {
+        // the most general type of triangulation is the serial one. here, all
+        // subdomain information is directly available
+        for (const auto &cell_id : cell_ids)
+          {
+            subdomain_ids.push_back(
+              triangulation.create_cell_iterator(cell_id)->subdomain_id());
+          }
+      }
+
+    return subdomain_ids;
+  }
+
+
+
   template <int dim, int spacedim>
   void
   get_subdomain_association(const Triangulation<dim, spacedim> &triangulation,
@@ -3077,9 +3164,9 @@ namespace GridTools
     // are owned by other processors -- either because the vertex is
     // on an artificial cell, or because it is on a ghost cell with
     // a smaller subdomain
-    if (const parallel::distributed::Triangulation<dim, spacedim> *tr =
-          dynamic_cast<const parallel::distributed::Triangulation<dim, spacedim>
-                         *>(&triangulation))
+    if (const auto *tr = dynamic_cast<
+          const parallel::DistributedTriangulationBase<dim, spacedim> *>(
+          &triangulation))
       for (const auto &cell : triangulation.active_cell_iterators())
         if (cell->is_artificial() ||
             (cell->is_ghost() &&
@@ -5102,7 +5189,7 @@ namespace GridTools
     guessed_points = GridTools::guess_point_owner(global_bboxes, local_points);
 
     // Preparing to call compute_point_locations on points which may be local
-    const auto &guess_loc_idx = std::get<0>(guessed_points)[my_rank];
+    const auto &       guess_loc_idx = std::get<0>(guessed_points)[my_rank];
     const unsigned int n_local_guess = guess_loc_idx.size();
 
     // Vector containing points which are probably local
@@ -5191,7 +5278,7 @@ namespace GridTools
 
     for (const auto &probable_owners : points_to_probable_owners)
       {
-        const auto &point_idx = probable_owners.first;
+        const auto &point_idx            = probable_owners.first;
         const auto &probable_owner_ranks = probable_owners.second;
         if (!std::binary_search(found_point_indices.begin(),
                                 found_point_indices.end(),
@@ -5217,12 +5304,13 @@ namespace GridTools
     for (const auto &received_ghost_point : received_ghost_points)
       {
         // Transforming CellsIds into Tria iterators
-        const auto &cell_ids = std::get<0>(received_ghost_point.second);
-        const unsigned int n_cells = cell_ids.size();
+        const auto &       cell_ids = std::get<0>(received_ghost_point.second);
+        const unsigned int n_cells  = cell_ids.size();
         std::vector<typename Triangulation<dim, spacedim>::active_cell_iterator>
           cell_iter(n_cells);
         for (unsigned int c = 0; c < n_cells; ++c)
-          cell_iter[c] = cell_ids[c].to_cell(cache.get_triangulation());
+          cell_iter[c] =
+            cache.get_triangulation().create_cell_iterator(cell_ids[c]);
 
         internal::DistributedComputePointLocations::merge_into_point_locations(
           cell_iter,
@@ -5241,11 +5329,11 @@ namespace GridTools
     // Copying data from the unordered map to the tuple
     // and returning output
     const unsigned int size_output = found_points.size();
-    auto &out_cells = std::get<0>(output_tuple);
-    auto &out_qpoints = std::get<1>(output_tuple);
-    auto &out_maps = std::get<2>(output_tuple);
-    auto &out_points = std::get<3>(output_tuple);
-    auto &out_ranks = std::get<4>(output_tuple);
+    auto &             out_cells   = std::get<0>(output_tuple);
+    auto &             out_qpoints = std::get<1>(output_tuple);
+    auto &             out_maps    = std::get<2>(output_tuple);
+    auto &             out_points  = std::get<3>(output_tuple);
+    auto &             out_ranks   = std::get<4>(output_tuple);
 
     out_cells.resize(size_output);
     out_qpoints.resize(size_output);
@@ -5256,11 +5344,11 @@ namespace GridTools
     unsigned int c = 0;
     for (const auto &cell_and_data : found_points)
       {
-        out_cells[c] = cell_and_data.first;
+        out_cells[c]   = cell_and_data.first;
         out_qpoints[c] = std::get<0>(cell_and_data.second);
-        out_maps[c] = std::get<1>(cell_and_data.second);
-        out_points[c] = std::get<2>(cell_and_data.second);
-        out_ranks[c] = std::get<3>(cell_and_data.second);
+        out_maps[c]    = std::get<1>(cell_and_data.second);
+        out_points[c]  = std::get<2>(cell_and_data.second);
+        out_ranks[c]   = std::get<3>(cell_and_data.second);
         ++c;
       }
 
@@ -5402,7 +5490,7 @@ namespace GridTools
 
     // Step 4: create the array of bboxes for output
     std::vector<std::vector<BoundingBox<spacedim>>> global_bboxes(n_procs);
-    unsigned int begin_idx = 0;
+    unsigned int                                    begin_idx = 0;
     for (unsigned int i = 0; i < n_procs; ++i)
       {
         // Number of local bounding boxes

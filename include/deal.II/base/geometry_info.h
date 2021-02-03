@@ -860,7 +860,8 @@ public:
 
   /**
    * Read or write the data of this object to or from a stream for the purpose
-   * of serialization
+   * of serialization using the [BOOST serialization
+   * library](https://www.boost.org/doc/libs/1_74_0/libs/serialization/doc/index.html).
    */
   template <class Archive>
   void
@@ -2935,7 +2936,7 @@ GeometryInfo<dim>::unit_cell_vertex(const unsigned int)
 {
   Assert(false, ExcNotImplemented());
 
-  return Point<dim>();
+  return {};
 }
 
 
@@ -3121,7 +3122,7 @@ GeometryInfo<dim>::cell_to_child_coordinates(
 
 {
   Assert(false, ExcNotImplemented());
-  return Point<dim>();
+  return {};
 }
 
 
@@ -3257,7 +3258,7 @@ GeometryInfo<dim>::child_to_cell_coordinates(
   const RefinementCase<dim> /*refine_case*/)
 {
   Assert(false, ExcNotImplemented());
-  return Point<dim>();
+  return {};
 }
 
 

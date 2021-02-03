@@ -443,7 +443,7 @@ class AffineConstraints;
  *
  * The algorithms used in the implementation of this class are described in
  * some detail in the
- * @ref hp_paper "hp paper".
+ * @ref hp_paper "hp-paper".
  * There is also a significant amount of documentation on how to use this
  * class in the
  * @ref constraints
@@ -1442,7 +1442,7 @@ public:
    * sparsity pattern entries.
    *
    * As explained in the
-   * @ref hp_paper "hp paper"
+   * @ref hp_paper "hp-paper"
    * and in step-27, first allocating a sparsity pattern and later coming back
    * and allocating additional entries for those matrix entries that will be
    * written to due to the elimination of constrained degrees of freedom
@@ -1623,7 +1623,9 @@ public:
     memory_consumption() const;
 
     /**
-     * Support for boost:serialization.
+     * Write and read the data of this object from a stream for the purpose
+     * of serialization using the [BOOST serialization
+     * library](https://www.boost.org/doc/libs/1_74_0/libs/serialization/doc/index.html).
      */
     template <class Archive>
     void

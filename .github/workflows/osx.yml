@@ -11,16 +11,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: setup
-      run: |
-        ./contrib/utilities/download_clang_format
     - name: info
       run: |
         g++ -v
         cmake --version
     - name: configure
       run: |
-        cmake -D CMAKE_BUILD_TYPE=Debug -D DEAL_II_CXX_FLAGS='-Werror' .
+        cmake -D CMAKE_BUILD_TYPE=Debug -D DEAL_II_CXX_FLAGS='-Werror' -D DEAL_II_EARLY_DEPRECATIONS=ON .
     - name: archive
       uses: actions/upload-artifact@v1
       with:
@@ -56,19 +53,17 @@ jobs:
     - name: setup
       run: |
         brew install openmpi
-        cmake --version
         # uncomment these for a gcc based build
         #export OMPI_CXX=g++
         #export OMPI_CC=gcc
         #export OMPI_FC=gfortran
-        ./contrib/utilities/download_clang_format
     - name: info
       run: |
         mpicxx -v
         cmake --version
     - name: configure
       run: |
-        CC=mpicc CXX=mpic++ cmake -D CMAKE_BUILD_TYPE=Debug -D DEAL_II_WITH_64BIT_INDICES=ON -D DEAL_II_CXX_FLAGS='-Werror' -D DEAL_II_WITH_MPI=on .
+        CC=mpicc CXX=mpic++ cmake -D CMAKE_BUILD_TYPE=Debug -D DEAL_II_WITH_64BIT_INDICES=ON -D DEAL_II_CXX_FLAGS='-Werror' -D DEAL_II_EARLY_DEPRECATIONS=ON -D DEAL_II_WITH_MPI=on .
     - name: archive
       uses: actions/upload-artifact@v1
       with:

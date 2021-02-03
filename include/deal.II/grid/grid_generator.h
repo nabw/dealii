@@ -25,6 +25,7 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/table.h>
 
+#include <deal.II/grid/reference_cell.h>
 #include <deal.II/grid/tria.h>
 
 #include <array>
@@ -127,6 +128,17 @@ namespace GridGenerator
   void
   simplex(Triangulation<dim, dim> &      tria,
           const std::vector<Point<dim>> &vertices);
+
+  /*
+   * Create a (coarse) grid with a single cell of the shape of the provided
+   * reference cell. This is a generalization of the hyper_cube() and simplex()
+   * functions above.
+   */
+  template <int dim, int spacedim>
+  void
+  reference_cell(const ReferenceCell::Type &   reference_cell,
+                 Triangulation<dim, spacedim> &tria);
+
 
   /**
    * Same as hyper_cube(), but with the difference that not only one cell is
@@ -1522,6 +1534,7 @@ namespace GridGenerator
    * Given the two triangulations specified as the first two arguments, create
    * the triangulation that contains the cells of both triangulation and store
    * it in the third parameter. Previous content of @p result will be deleted.
+   * One of the two input triangulations can also be the @p result triangulation.
    *
    * This function is most often used to compose meshes for more complicated
    * geometries if the geometry can be composed of simpler parts for which
@@ -1712,7 +1725,8 @@ namespace GridGenerator
    * existing triangulation. A prototypical case is a 2d domain with
    * rectangular holes. This can be achieved by first meshing the entire
    * domain and then using this function to get rid of the cells that are
-   * located at the holes. Likewise, you could create the mesh that
+   * located at the holes. A demonstration of this particular use case is part
+   * of step-27. Likewise, you could create the mesh that
    * GridGenerator::hyper_L() produces by starting with a
    * GridGenerator::hyper_cube(), refining it once, and then calling the
    * current function with a single cell in the second argument.
@@ -1916,15 +1930,25 @@ namespace GridGenerator
    * meshing one eighths of a sphere are subdivided into tetrahedra, and how
    * the curved surface is taken into account. Colors indicate how boundary
    * indicators are inherited:
+   * @image html "convert_hypercube_to_simplex_mesh_visualization_octant.png"
+   *
+   * In general, each quadrilateral in 2d is subdivided into eight triangles,
+   * and each hexahedron in 3d into 24 tetrahedra as shown here:
    * @image html "convert_hypercube_to_simplex_mesh_visualization.png"
    *
-   * Thereby, in 2D a quadrilateral cell is converted into 8 triangle cells,
-   * whereas in 3D a hexahedron cell is converted into 24 tetrahedra cells.
-   *
-   * Material ID and boundary IDs will be inherited after conversion.
+   * Material ID and boundary IDs are inherited upon conversion.
    *
    * @param in_tria The triangulation containing hex elements.
    * @param out_tria The converted triangulation containing tet elements.
+   *
+   * @note No manifold objects are copied by this function: you must
+   *   copy existing manifold objects from @p in_tria to @p out_tria, e.g.,
+   *   with the following code:
+   * @code
+   * for (const auto i : in_tria.get_manifold_ids())
+   *   if (i != numbers::flat_manifold_id)
+   *     out_tria.set_manifold(i, in_tria.get_manifold(i));
+   * @endcode
    */
   template <int dim, int spacedim>
   void

@@ -25,6 +25,50 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace HDF5
 {
+  namespace internal
+  {
+    namespace HDF5ObjectImplementation
+    {
+      /**
+       * Abort, should there be an exception being processed (see the error
+       * message).
+       */
+      void
+      check_exception(const std::string &type, const std::string &name)
+      {
+#  ifdef DEAL_II_WITH_MPI
+#    if __cpp_lib_uncaught_exceptions >= 201411
+        // std::uncaught_exception() is deprecated in c++17
+        if (std::uncaught_exceptions() != 0)
+#    else
+        if (std::uncaught_exception() == true)
+#    endif
+          {
+            std::cerr
+              << "---------------------------------------------------------\n"
+              << "HDF5 " + type + " objects call " + name +
+                   " to end access to\n"
+              << "them and release any resources they acquired. This call\n"
+              << "requires MPI synchronization. Since an exception is\n"
+              << "currently uncaught, this synchronization would likely\n"
+              << "deadlock because only the current process is trying to\n"
+              << "destroy the object. As a consequence, the program will be\n"
+              << "aborted and the HDF5 might be corrupted.\n"
+              << "---------------------------------------------------------"
+              << std::endl;
+
+            MPI_Abort(MPI_COMM_WORLD, 1);
+          }
+#  else
+        (void)type;
+        (void)name;
+#  endif
+      }
+    } // namespace HDF5ObjectImplementation
+  }   // namespace internal
+
+
+
   HDF5Object::HDF5Object(const std::string &name, const bool mpi)
     : name(name)
     , mpi(mpi)
@@ -50,6 +94,8 @@ namespace HDF5
     , global_no_collective_cause(H5D_MPIO_SET_INDEPENDENT)
   {
     hdf5_reference = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("DataSet",
+                                                          "H5Dclose");
       // Release the HDF5 resource
       const herr_t ret = H5Dclose(*pointer);
       AssertNothrow(ret >= 0, ExcInternalError());
@@ -57,6 +103,8 @@ namespace HDF5
       delete pointer;
     });
     dataspace      = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("DataSpace",
+                                                          "H5Sclose");
       // Release the HDF5 resource
       const herr_t ret = H5Sclose(*pointer);
       AssertNothrow(ret >= 0, ExcInternalError());
@@ -105,6 +153,8 @@ namespace HDF5
     , global_no_collective_cause(H5D_MPIO_SET_INDEPENDENT)
   {
     hdf5_reference = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("DataSet",
+                                                          "H5Dclose");
       // Release the HDF5 resource
       const herr_t ret = H5Dclose(*pointer);
       AssertNothrow(ret >= 0, ExcInternalError());
@@ -112,6 +162,8 @@ namespace HDF5
       delete pointer;
     });
     dataspace      = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("DataSpace",
+                                                          "H5Sclose");
       // Release the HDF5 resource
       const herr_t ret = H5Sclose(*pointer);
       AssertNothrow(ret >= 0, ExcInternalError());
@@ -279,6 +331,7 @@ namespace HDF5
     : HDF5Object(name, mpi)
   {
     hdf5_reference = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("Group", "H5Gclose");
       // Release the HDF5 resource
       const herr_t ret = H5Gclose(*pointer);
       AssertNothrow(ret >= 0, ExcInternalError());
@@ -367,6 +420,7 @@ namespace HDF5
     : Group(name, mpi)
   {
     hdf5_reference = std::shared_ptr<hid_t>(new hid_t, [](hid_t *pointer) {
+      internal::HDF5ObjectImplementation::check_exception("File", "H5Fclose");
       // Release the HDF5 resource
       const herr_t err = H5Fclose(*pointer);
       AssertNothrow(err >= 0, ExcInternalError());

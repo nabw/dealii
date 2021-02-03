@@ -91,7 +91,7 @@ namespace MatrixFreeTools
                                                n_components,
                                                Number,
                                                VectorizedArrayType> &) const,
-    CLASS *            owning_class,
+    const CLASS *      owning_class,
     const unsigned int dof_no                   = 0,
     const unsigned int quad_no                  = 0,
     const unsigned int first_selected_component = 0);
@@ -99,8 +99,8 @@ namespace MatrixFreeTools
 
   /**
    * Compute the matrix representation of a linear operator (@p matrix), given
-   * @p matrix_free and the local cell integral operation @p local_vmult. The
-   * vector is initialized to the right size in the function.
+   * @p matrix_free and the local cell integral operation @p local_vmult.
+   * Constrained entries on the diagonal are set to one.
    *
    * The parameters @p dof_no, @p quad_no, and @p first_selected_component are
    * passed to the constructor of the FEEvaluation that is internally set up.
@@ -609,7 +609,7 @@ namespace MatrixFreeTools
                                                n_components,
                                                Number,
                                                VectorizedArrayType> &) const,
-    CLASS *            owning_class,
+    const CLASS *      owning_class,
     const unsigned int dof_no,
     const unsigned int quad_no,
     const unsigned int first_selected_component)
@@ -731,10 +731,12 @@ namespace MatrixFreeTools
 
     matrix.compress(VectorOperation::add);
 
-    for (unsigned int i = 0; i < matrix.m(); ++i)
-      if (matrix.get_row_length(i) > 0 && matrix(i, i) == 0.0 &&
-          constraints.is_constrained(i))
-        matrix.add(i, i, 1);
+    for (auto &entry : matrix)
+      if (entry.row() == entry.column() && entry.value() == 0.0)
+        {
+          Assert(constraints.is_constrained(entry.row()), ExcNotImplemented());
+          entry.value() = 1.0;
+        }
   }
 
   template <typename CLASS,

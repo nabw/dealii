@@ -106,7 +106,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::create_cell_subrange_hp_by_index(
         Assert(
           fe_indices[i] >= fe_indices[i - 1],
           ExcMessage(
-            "Cell range must be over sorted range of fe indices in hp case!"));
+            "Cell range must be over sorted range of FE indices in hp-case!"));
       AssertIndexRange(range.first, fe_indices.size() + 1);
       AssertIndexRange(range.second, fe_indices.size() + 1);
 #endif
@@ -579,7 +579,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::internal_reinit(
     {
       if (dof_handler.size() > 1)
         {
-          // check if all DoHandlers are in the same hp mode; and if hp
+          // check if all DoHandlers are in the same hp-mode; and if hp-
           // capabilities are enabled: check if active_fe_indices of all
           // DoFHandler are the same.
           for (unsigned int i = 1; i < dof_handler.size(); ++i)
@@ -1481,7 +1481,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::initialize_indices(
              ++fe_no)
           shape_info_dummy(c, fe_no).reinit(
             dof_handlers[no]->get_fe(fe_no).reference_cell_type() ==
-                ReferenceCell::get_hypercube(dim) ?
+                ReferenceCell::Type::get_hypercube<dim>() ?
               quad :
               quad_simplex,
             dof_handlers[no]->get_fe(fe_no),
@@ -1508,7 +1508,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::initialize_indices(
     dof_info,
     face_setup,
     constraint_values,
-    additional_data.use_vector_data_exchanger_full);
+    additional_data.communicator_sm != MPI_COMM_SELF);
 
   // set constraint pool from the std::map and reorder the indices
   std::vector<const std::vector<double> *> constraints(
@@ -1670,7 +1670,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::initialize_indices(
           face_setup.inner_ghost_faces,
           is_fe_dg[count++] && additional_data.hold_all_faces_to_owned_cells,
           task_info.communicator_sm,
-          additional_data.use_vector_data_exchanger_full);
+          task_info.communicator_sm != MPI_COMM_SELF);
     }
 
   for (auto &di : dof_info)

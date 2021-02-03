@@ -150,6 +150,7 @@
 #cmakedefine DEAL_II_CXX14_CONSTEXPR_BUG
 
 #cmakedefine DEAL_II_DEPRECATED @DEAL_II_DEPRECATED@
+#cmakedefine DEAL_II_DEPRECATED_EARLY @DEAL_II_DEPRECATED_EARLY@
 #cmakedefine DEAL_II_FALLTHROUGH @DEAL_II_FALLTHROUGH@
 #cmakedefine DEAL_II_CONSTEXPR @DEAL_II_CONSTEXPR@
 
@@ -190,6 +191,9 @@
 
 /* cmake/modules/FindARPACK.cmake */
 #cmakedefine DEAL_II_ARPACK_WITH_PARPACK
+
+/* cmake/modules/FindGMSH.cmake */
+#cmakedefine DEAL_II_GMSH_WITH_API
 
 /* cmake/modules/FindPETSC.cmake */
 #cmakedefine DEAL_II_PETSC_WITH_COMPLEX
@@ -399,7 +403,7 @@ _Pragma("GCC diagnostic ignored \"-Wextra\"")                     /*!*/ \
 _Pragma("GCC diagnostic ignored \"-Waddress-of-packed-member\"")        \
 _Pragma("GCC diagnostic ignored \"-Wdeprecated-copy\"")                 \
 _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")         \
-_Pragma("GCC diagnostic ignored \"-Wexpansion-to-defined\"")            \
+_Pragma("GCC diagnostic ignored \"-Wdeprecated-volatile\"")             \
 _Pragma("GCC diagnostic ignored \"-Wexpansion-to-defined\"")            \
 _Pragma("GCC diagnostic ignored \"-Wignored-attributes\"")              \
 _Pragma("GCC diagnostic ignored \"-Wignored-qualifiers\"")              \

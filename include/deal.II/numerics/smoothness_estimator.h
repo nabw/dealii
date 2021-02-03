@@ -228,10 +228,10 @@ namespace SmoothnessEstimator
      * the default configuration for smoothness estimation purposes.
      *
      * For each finite element of the provided @p fe_collection, we use as many
-     * modes as its polynomial degree plus one, since we start with the first
-     * Legendre polynomial which is just a constant. Further for each element,
-     * we use a Gaussian quadrature designed to yield exact results for the
-     * highest order Legendre polynomial used.
+     * modes as its polynomial degree plus two. This includes the first Legendre
+     * polynomial which is just a constant. Further for each element, we use a
+     * Gaussian quadrature designed to yield exact results for the highest order
+     * Legendre polynomial used.
      */
     template <int dim, int spacedim>
     FESeries::Legendre<dim, spacedim>
@@ -454,10 +454,10 @@ namespace SmoothnessEstimator
      * the default configuration for smoothness estimation purposes.
      *
      * For each finite element of the provided @p fe_collection, we use as many
-     * modes as its polynomial degree plus one, and at least three modes.
-     * Further for each element, we use a 4-point Gaussian quarature iterated in
-     * each dimension by the maximal wave number, which is the number of modes
-     * decreased by one since we start with $k = 0$.
+     * modes as its polynomial degree plus two. Further for each element, we use
+     * a 5-point Gaussian quarature iterated in each dimension by the maximal
+     * wave number, which is the number of modes decreased by one since we start
+     * with $k = 0$.
      */
     template <int dim, int spacedim>
     FESeries::Fourier<dim, spacedim>

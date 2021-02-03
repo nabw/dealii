@@ -46,9 +46,9 @@ namespace FiniteElementDomination
    * Q(k') if $k\le k'$.
    *
    * This enum is used in the FiniteElement::compare_for_domination() function
-   * that is used in the context of hp finite element methods when determining
+   * that is used in the context of hp-finite element methods when determining
    * what to do at faces where two different finite elements meet (see the
-   * @ref hp_paper "hp paper"
+   * @ref hp_paper "hp-paper"
    * for a more detailed description of the following). In that case, the
    * degrees of freedom of one side need to be constrained to those on the
    * other side. The determination which side is which is based on the outcome
@@ -56,7 +56,7 @@ namespace FiniteElementDomination
    * to the dominating one.
    *
    * Note that there are situations where neither side dominates. The
-   * @ref hp_paper "hp paper"
+   * @ref hp_paper "hp-paper"
    * lists two case, with the simpler one being that a $Q_2\times Q_1$ vector-
    * valued element (i.e. a <code>FESystem(FE_Q(2),1,FE_Q(1),1)</code>) meets
    * a $Q_1\times Q_2$ element: here, for each of the two vector-components,
@@ -80,7 +80,7 @@ namespace FiniteElementDomination
    * could also be used by discontinuous elements, for example.
    *
    * More details on domination can be found in the
-   * @ref hp_paper "hp paper".
+   * @ref hp_paper "hp-paper".
    */
   enum Domination
   {
@@ -142,28 +142,32 @@ namespace internal
    *
    * As an example, the data is shown for a quadratic wedge. Which consists of
    * 6 vertices, 9 lines, and 5 faces (two triangles and three quadrilaterals).
-   *
+   * @code
    *              vertices                  lines                  faces cell
    * dpo_excl  1  1  1  1  1  1 | 1  1  1  1  1  1  1  1  1 |  0  0  1  1  1 |  0
    * dpo_incl  1  1  1  1  1  1 | 3  3  3  3  3  3  3  3  3 |  6  6  9  9  9 | 18
    * obj_index 0  1  2  3  4  5 | 6  7  8  9 10 11 12 13 14 | 15 15 15 16 17 | 18
+   * @endcode
    *
    * Since the above table looks as follows for:
    *
    * - a triangle:
-   *
+   * @code
    * dpo_excl  1  1  1 | 1  1  1 |  0
    * obj_index 0  1  2 | 3  4  5 |  6
+   * @endcode
    *
    * - quadrilateral:
-   *
+   * @code
    * dpo_excl  1  1  1  1 | 1  1  1  1 |  1
    * obj_index 0  1  2  3 | 4  5  6  7 |  8
+   * @endcode
    *
    * The index of the first d-dimensional object within each face results as:
-   *
+   * @code
    *                         vertices      lines       face
    * first_obj_index_on_face 0 0 0 0 0 | 3 3 4 4 4 | 6 6 8 8 8
+   * @endcode
    *
    */
   struct GenericDoFsPerObject
@@ -672,6 +676,18 @@ public:
   unsigned int
   get_first_face_quad_index(const unsigned int face_no = 0) const;
 };
+
+namespace internal
+{
+  /**
+   * Utility function to convert "dofs per object" information
+   * of a @p dim dimensional reference cell @p cell_type.
+   */
+  internal::GenericDoFsPerObject
+  expand(const unsigned int               dim,
+         const std::vector<unsigned int> &dofs_per_object,
+         const ReferenceCell::Type        cell_type);
+} // namespace internal
 
 
 

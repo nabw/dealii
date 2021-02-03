@@ -687,6 +687,19 @@ namespace DoFTools
               {
                 const FiniteElement<dim, spacedim> &fe = cell->get_fe();
 
+                const auto reference_cell_type = cell->reference_cell_type();
+
+                const auto &cell_rc =
+                  ReferenceCell::internal::Info::get_cell(reference_cell_type);
+                const auto &face_rc =
+                  ReferenceCell::internal::Info::get_face(reference_cell_type,
+                                                          face);
+
+                const unsigned int n_vertices_per_cell = cell_rc.n_vertices();
+                const unsigned int n_lines_per_cell    = cell_rc.n_lines();
+                const unsigned int n_vertices_per_face = face_rc.n_vertices();
+                const unsigned int n_lines_per_face    = face_rc.n_lines();
+
                 const unsigned int dofs_per_face = fe.n_dofs_per_face(face);
                 face_dof_indices.resize(dofs_per_face);
                 cell->face(face)->get_dof_indices(face_dof_indices,
@@ -701,7 +714,7 @@ namespace DoFTools
                     // non-primitive, but use usual convention (see docs)
                     {
                       // first get at the cell-global number of a face dof,
-                      // to ask the fe certain questions
+                      // to ask the FE certain questions
                       const unsigned int cell_index =
                         (dim == 1 ?
                            i :
@@ -709,13 +722,26 @@ namespace DoFTools
                               (i < 2 * fe.n_dofs_per_vertex() ?
                                  i :
                                  i + 2 * fe.n_dofs_per_vertex()) :
-                              (dim == 3 ? (i < 4 * fe.n_dofs_per_vertex() ?
+                              (dim == 3 ? (i < n_vertices_per_face *
+                                                 fe.n_dofs_per_vertex() ?
                                              i :
-                                             (i < 4 * fe.n_dofs_per_vertex() +
-                                                    4 * fe.n_dofs_per_line() ?
-                                                i + 4 * fe.n_dofs_per_vertex() :
-                                                i + 4 * fe.n_dofs_per_vertex() +
-                                                  8 * fe.n_dofs_per_line())) :
+                                             (i < n_vertices_per_face *
+                                                      fe.n_dofs_per_vertex() +
+                                                    n_lines_per_face *
+                                                      fe.n_dofs_per_line() ?
+                                                (i - n_vertices_per_face *
+                                                       fe.n_dofs_per_vertex()) +
+                                                  n_vertices_per_cell *
+                                                    fe.n_dofs_per_vertex() :
+                                                (i -
+                                                 n_vertices_per_face *
+                                                   fe.n_dofs_per_vertex() -
+                                                 n_lines_per_face *
+                                                   fe.n_dofs_per_line()) +
+                                                  n_vertices_per_cell *
+                                                    fe.n_dofs_per_vertex() +
+                                                  n_lines_per_cell *
+                                                    fe.n_dofs_per_line())) :
                                           numbers::invalid_unsigned_int)));
                       if (fe.is_primitive(cell_index))
                         {
@@ -2201,7 +2227,7 @@ namespace DoFTools
         for (unsigned int fe_index = 0; fe_index < fe_collection.size();
              ++fe_index)
           {
-            // check whether every fe in the collection has support points
+            // check whether every FE in the collection has support points
             Assert(fe_collection[fe_index].has_support_points(),
                    typename FiniteElement<dim>::ExcFEHasNoSupportPoints());
             q_coll_dummy.push_back(Quadrature<dim>(

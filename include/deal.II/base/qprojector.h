@@ -24,6 +24,8 @@
 
 #include <deal.II/grid/reference_cell.h>
 
+#include <deal.II/hp/q_collection.h>
+
 DEAL_II_NAMESPACE_OPEN
 
 
@@ -232,12 +234,12 @@ public:
    * version of this function that takes the reference cell type instead.
    */
   DEAL_II_DEPRECATED static Quadrature<dim>
-  project_to_all_faces(const SubQuadrature &quadrature);
+  project_to_all_faces(const Quadrature<dim - 1> &quadrature);
 
   /**
-   * Take a face quadrature formula and generate a cell quadrature formula
-   * from it where the quadrature points of the given argument are projected
-   * on all faces.
+   * Take a collection of face quadrature formulas and generate a cell
+   * quadrature formula from it where the quadrature points of the given
+   * argument are projected on all faces.
    *
    * The weights of the new rule are replications of the original weights.
    * Thus, the sum of the weights is not one, but the number of faces, which
@@ -251,8 +253,16 @@ public:
    * each face, in order to cope possibly different orientations of the mesh.
    */
   static Quadrature<dim>
-  project_to_all_faces(const ReferenceCell::Type reference_cell_type,
-                       const SubQuadrature &     quadrature);
+  project_to_all_faces(const ReferenceCell::Type       reference_cell_type,
+                       const hp::QCollection<dim - 1> &quadrature);
+
+  /**
+   * Like the above function, applying the same face quadrature
+   * formula on all faces.
+   */
+  static Quadrature<dim>
+  project_to_all_faces(const ReferenceCell::Type  reference_cell_type,
+                       const Quadrature<dim - 1> &quadrature);
 
   /**
    * Take a face quadrature formula and generate a cell quadrature formula
@@ -445,6 +455,18 @@ public:
          const unsigned int        n_quadrature_points);
 
     /**
+     * Like the above function but taking a quadrature collection, enabling
+     * that each face might have different number of quadrature points.
+     */
+    static DataSetDescriptor
+    face(const ReferenceCell::Type       reference_cell_type,
+         const unsigned int              face_no,
+         const bool                      face_orientation,
+         const bool                      face_flip,
+         const bool                      face_rotation,
+         const hp::QCollection<dim - 1> &quadrature);
+
+    /**
      * Static function to generate an offset object for a given subface of a
      * cell with the given face orientation, flip and rotation. This function
      * of course is only allowed if <tt>dim>=2</tt>, and the face orientation,
@@ -513,29 +535,6 @@ public:
      */
     DataSetDescriptor(const unsigned int dataset_offset);
   };
-
-private:
-  /**
-   * Given a quadrature object in 2d, reflect all quadrature points at the
-   * main diagonal and return them with their original weights.
-   *
-   * This function is necessary for projecting a 2d quadrature rule onto the
-   * faces of a 3d cube, since there we need both orientations.
-   */
-  static Quadrature<2>
-  reflect(const Quadrature<2> &q);
-
-  /**
-   * Given a quadrature object in 2d, rotate all quadrature points by @p
-   * n_times * 90 degrees counterclockwise and return them with their original
-   * weights.
-   *
-   * This function is necessary for projecting a 2d quadrature rule onto the
-   * faces of a 3d cube, since there we need all rotations to account for
-   * face_flip and face_rotation of non-standard faces.
-   */
-  static Quadrature<2>
-  rotate(const Quadrature<2> &q, const unsigned int n_times);
 };
 
 /*@}*/
@@ -572,6 +571,26 @@ template <int dim>
 inline QProjector<dim>::DataSetDescriptor::operator unsigned int() const
 {
   return dataset_offset;
+}
+
+
+
+template <int dim>
+Quadrature<dim> inline QProjector<dim>::project_to_all_faces(
+  const Quadrature<dim - 1> &quadrature)
+{
+  return project_to_all_faces(ReferenceCell::Type::get_hypercube<dim>(),
+                              quadrature);
+}
+
+
+template <int dim>
+Quadrature<dim> inline QProjector<dim>::project_to_all_faces(
+  const ReferenceCell::Type  reference_cell_type,
+  const Quadrature<dim - 1> &quadrature)
+{
+  return project_to_all_faces(reference_cell_type,
+                              hp::QCollection<dim - 1>(quadrature));
 }
 
 
@@ -616,12 +635,9 @@ QProjector<3>::project_to_face(const ReferenceCell::Type reference_cell_type,
 
 template <>
 Quadrature<1>
-QProjector<1>::project_to_all_faces(const Quadrature<0> &quadrature);
-template <>
-Quadrature<1>
 QProjector<1>::project_to_all_faces(
   const ReferenceCell::Type reference_cell_type,
-  const Quadrature<0> &     quadrature);
+  const hp::QCollection<0> &quadrature);
 
 
 template <>

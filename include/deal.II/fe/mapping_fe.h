@@ -79,6 +79,15 @@ public:
   unsigned int
   get_degree() const;
 
+  // for documentation, see the Mapping base class
+  virtual BoundingBox<spacedim>
+  get_bounding_box(const typename Triangulation<dim, spacedim>::cell_iterator
+                     &cell) const override;
+
+
+  virtual bool
+  is_compatible_with(const ReferenceCell::Type &cell_type) const override;
+
   /**
    * Always returns @p true because the default implementation of functions in
    * this class preserves vertex locations.
@@ -97,11 +106,7 @@ public:
     const typename Triangulation<dim, spacedim>::cell_iterator &cell,
     const Point<dim> &p) const override;
 
-  /**
-   * for documentation, see the Mapping base class
-   *
-   * note: not implemented yet
-   */
+  // for documentation, see the Mapping base class
   virtual Point<dim>
   transform_real_to_unit_cell(
     const typename Triangulation<dim, spacedim>::cell_iterator &cell,
@@ -401,10 +406,12 @@ public:
   virtual std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase>
   get_data(const UpdateFlags, const Quadrature<dim> &quadrature) const override;
 
+  using Mapping<dim, spacedim>::get_face_data;
+
   // documentation can be found in Mapping::get_face_data()
   virtual std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase>
-  get_face_data(const UpdateFlags          flags,
-                const Quadrature<dim - 1> &quadrature) const override;
+  get_face_data(const UpdateFlags               flags,
+                const hp::QCollection<dim - 1> &quadrature) const override;
 
   // documentation can be found in Mapping::get_subface_data()
   virtual std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase>
@@ -421,12 +428,14 @@ public:
     dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
       &output_data) const override;
 
+  using Mapping<dim, spacedim>::fill_fe_face_values;
+
   // documentation can be found in Mapping::fill_fe_face_values()
   virtual void
   fill_fe_face_values(
     const typename Triangulation<dim, spacedim>::cell_iterator &cell,
     const unsigned int                                          face_no,
-    const Quadrature<dim - 1> &                                 quadrature,
+    const hp::QCollection<dim - 1> &                            quadrature,
     const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
     dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
       &output_data) const override;
@@ -461,6 +470,9 @@ protected:
   virtual std::vector<Point<spacedim>>
   compute_mapping_support_points(
     const typename Triangulation<dim, spacedim>::cell_iterator &cell) const;
+
+private:
+  Table<2, double> mapping_support_point_weights;
 };
 
 
@@ -594,6 +606,8 @@ MappingFE<dim, spacedim>::preserves_vertex_locations() const
 {
   return true;
 }
+
+
 
 #endif // DOXYGEN
 

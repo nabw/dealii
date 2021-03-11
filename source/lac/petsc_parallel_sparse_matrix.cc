@@ -561,7 +561,7 @@ namespace PETScWrappers
       IndexSet::size_type n_l2g_row = local_active_rows.n_elements();
       IndexSet::size_type n_l2g_col = local_active_columns.n_elements();
       std::vector<int>    idx_glob_row(n_l2g_row);
-      std::vector<int>    idx_glob_col(n_l2g_row);
+      std::vector<int>    idx_glob_col(n_l2g_col);
       unsigned int        k;
       for (k = 0; k < n_l2g_row; ++k)
         {
